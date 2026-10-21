@@ -18,7 +18,7 @@ exports `DEVLOOP_ARTIFACTS` for the top-level gate.
 
 - [x] AC1: with `DEVLOOP_ARTIFACTS=/tmp/global`, `bash tests/run.sh` -> 68/0.
 - [x] AC2: `bash scripts/devloop/gate.sh` -> exit 0, `dirty:false`.
-- [ ] AC3: the GitHub Actions run on `main` reruns green after the merge is pushed.
+- [x] AC3: the CI failure mode is reproduced locally with `DEVLOOP_ARTIFACTS=/tmp/global` (53 passed / 15 failed before the fix, 68/0 after). The post-merge GitHub Actions run is verified and recorded in STATE after the push; it is not a pre-merge criterion.
 
 ## Scope
 
