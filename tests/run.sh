@@ -5,6 +5,11 @@
 # Run: bash tests/run.sh
 set -uo pipefail
 
+# The gate may be invoked from CI with a global artifact store. Fixtures are
+# separate repositories and must use their own stores, otherwise every
+# SHA-keyed assertion reads another repository's evidence.
+unset DEVLOOP_ARTIFACTS DEVLOOP_CONF DEVLOOP_LEGACY_ARTIFACTS
+
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
 REPO="$TMP/repo"
