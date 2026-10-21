@@ -99,12 +99,16 @@ esac
 SHA="$(head_sha)"
 EVIDENCE_SHA="$SHA"
 BOOKKEEPING=0
+# ADR 0002: after an integration, STATE/LESSONS and the task file's
+# status/acceptance checkboxes are bookkeeping; the review process forbids
+# rewriting the acceptance text.
+BOOKKEEPING_RE='^docs/(STATE|LESSONS)\.md$|^docs/tasks/[^/]+\.md$'
 FOUND="$(find_integration "$SHA")"
 if [ -z "$FOUND" ] && git rev-parse --verify --quiet HEAD^ >/dev/null 2>&1; then
   PARENT="$(git rev-parse HEAD^)"
   BOOK_DIFF="$(git diff --name-only "$PARENT..$SHA" || true)"
   if [ -n "$BOOK_DIFF" ] \
-     && [ -z "$(printf '%s\n' "$BOOK_DIFF" | grep -vE '^docs/(STATE|LESSONS)\.md$' || true)" ]; then
+     && [ -z "$(printf '%s\n' "$BOOK_DIFF" | grep -vE "$BOOKKEEPING_RE" || true)" ]; then
     EVIDENCE_SHA="$PARENT"
     BOOKKEEPING=1
     FOUND="$(find_integration "$EVIDENCE_SHA")"
@@ -180,7 +184,7 @@ if [ -f docs/STATE.md ]; then
   if [ "$STATE_SHA" = "$SHA" ]; then
     ok "docs/STATE.md verified at HEAD"
   elif [ -n "$STATE_SHA" ] && [ "$(git rev-parse HEAD^ 2>/dev/null || true)" = "$STATE_SHA" ] \
-       && [ -z "$(git diff --name-only "$STATE_SHA..$SHA" | grep -vE '^docs/(STATE|LESSONS)\.md$' || true)" ]; then
+       && [ -z "$(git diff --name-only "$STATE_SHA..$SHA" | grep -vE "$BOOKKEEPING_RE" || true)" ]; then
     ok "docs/STATE.md verified at HEAD^; HEAD is a bookkeeping commit"
   else
     warn "docs/STATE.md last_verified_sha=${STATE_SHA:-unset} != HEAD; state may be stale"

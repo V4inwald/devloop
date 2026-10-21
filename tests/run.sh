@@ -497,11 +497,12 @@ git switch -q main
 
 say "bookkeeping doctor"
 printf '\n<!-- bookkeeping probe -->\n' >> docs/STATE.md
-git add docs/STATE.md
+printf '\n<!-- task bookkeeping probe -->\n' >> docs/tasks/task-001.md
+git add docs/STATE.md docs/tasks/task-001.md
 git commit -q -m "chore(state): probe bookkeeping evidence"
 D_OUT="$(bash scripts/devloop/doctor.sh 2>&1)"; D_CODE=$?
-if [ "$D_CODE" -eq 0 ]; then ok "doctor accepts a bookkeeping commit"
-else ko "doctor accepts a bookkeeping commit"; printf '%s\n' "$D_OUT" | sed 's/^/    /'; fi
+if [ "$D_CODE" -eq 0 ]; then ok "doctor accepts STATE and task-status bookkeeping"
+else ko "doctor accepts STATE and task-status bookkeeping"; printf '%s\n' "$D_OUT" | sed 's/^/    /'; fi
 printf '%s' "$D_OUT" | grep -q "bookkeeping commit" \
   && ok "doctor names the bookkeeping commit" || ko "doctor names the bookkeeping commit"
 
