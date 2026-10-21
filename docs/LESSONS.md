@@ -59,3 +59,12 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
 - 2026-10-21 (task-006): when `main` cannot be pushed directly, bookkeeping
   (`STATE.md`/`LESSONS.md`) travels through a short `state/<sha>` PR; the
   substance of the exception is unchanged, only its transport.
+- 2026-10-21 (task-007): detection is not prevention → say it in the docs and
+  test the positive and negative paths with a stub, including a forged
+  "Merge pull request #N" subject.
+- 2026-10-21 (task-007): a private repository on GitHub Free cannot have branch
+  protection or rulesets (403) → decide public/Pro or accept detection, and test
+  the real rejection instead of assuming the plan allows it.
+- 2026-10-21 (process): `git add -A` in a workspace that also contains harness
+  artifacts (`.plugin-work/`) swept 2 700 unrelated lines into a commit → stage
+  explicit paths and inspect `git status` before committing.
