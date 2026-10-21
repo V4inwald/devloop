@@ -59,3 +59,12 @@ Out of scope: `integrate.sh` (task-002), install, documentation.
   belong to task-002 (integration) and task-004 (docs).
 - Deferred deliberately: `integrate.sh` starts writing `merge_gate` in
   task-002; doctor already consumes it.
+- 2026-10-21 (round 2): two independent verdicts on the same SHA.
+  `task-001-r2.md` = revise, `task-001-r3.md` = approve. The stricter finding
+  wins: `runner.temp` is not available in `jobs.<job_id>.env`, so
+  `DEVLOOP_ARTIFACTS` moved to the gate step. r3 did not catch that context
+  bug, which is why the CI fix is taken anyway.
+- 2026-10-21 (size accounting): review verdicts are the output of the review,
+  not part of the change. `diff_lines` now excludes `docs/reviews/`; the
+  substantive diff is 319 lines, under `MAX_DIFF_LINES=400`, and a test pins
+  the exclusion.

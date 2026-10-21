@@ -261,6 +261,23 @@ expect_fail "integrate refuses a dirty-tree gate" bash scripts/devloop/integrate
 git restore .
 git switch -q main
 
+say "size accounting"
+git switch -q main
+new_branch task/004-size
+printf '// size probe\n' >> src/math.js
+git commit -qam "chore(math): probe the size accounting"
+mkdir -p docs/reviews
+printf '# padding verdict\n' > docs/reviews/padding-r1.md
+for i in $(seq 1 40); do printf -- '- evidence line %s\n' "$i" >> docs/reviews/padding-r1.md; done
+git add -A
+git commit -q -m "docs(reviews): add size probe evidence"
+BASE_SIZE="$(git merge-base main HEAD)"
+RAW_SIZE="$(git diff --numstat "$BASE_SIZE..HEAD" | awk '{a+=$1;d+=$2} END{print a+d}')"
+CODE_SIZE="$(bash -c '. ./scripts/devloop/common.sh; diff_lines "$1"' _ "$BASE_SIZE")"
+[ "$CODE_SIZE" -lt "$RAW_SIZE" ] \
+  && ok "size accounting ignores review evidence" || ko "size accounting ignores review evidence"
+git switch -q main
+
 say "size limit"
 new_branch task/004-big
 node -e 'let s=""; for (let i=0;i<450;i++) s += `export const v${i} = ${i};\n`; process.stdout.write(s)' > src/big.js

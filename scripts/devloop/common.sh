@@ -77,8 +77,12 @@ fm() {
     | sed -E "s/^$2:[[:space:]]*//; s/[[:space:]]*$//; s/^[\"']//; s/[\"']$//"
 }
 
-diff_lines() { # <base> -> added + removed lines
-  git diff --numstat "$1..HEAD" | awk '{ a += $1; d += $2 } END { print a + d + 0 }'
+# Added + removed lines outside review evidence. The size limit exists to keep
+# the change reviewable; verdict files are the output of the review, not the
+# change, and counting them would let evidence consume the budget it protects.
+diff_lines() {
+  git diff --numstat "$1..HEAD" \
+    | awk '$3 !~ /^docs\/reviews\// { a += $1; d += $2 } END { print a + d + 0 }'
 }
 
 changed_files() { git diff --name-only "$1..HEAD"; }
