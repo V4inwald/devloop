@@ -603,6 +603,9 @@ say "pre-push protection"
 git init -q --bare "$TMP/remote.git"
 git remote add origin "$TMP/remote.git"
 expect_fail "pre-push blocks a direct push to main" git push -q origin main
+printf '\nALLOW_MAIN_PUSH=1\n' >> .devloop.conf
+expect_fail "pre-push ignores a repo-local ALLOW_MAIN_PUSH" env -u ALLOW_MAIN_PUSH git push -q origin main
+git checkout -q -- .devloop.conf
 expect_ok "ALLOW_MAIN_PUSH=1 overrides deliberately" env ALLOW_MAIN_PUSH=1 git push -q origin main
 new_branch task/007-push
 printf '\nexport const pushed = 1;\n' >> src/math.js
@@ -611,6 +614,57 @@ expect_ok "pre-push allows a task branch" git push -q origin task/007-push
 git reset -q --hard HEAD~1
 expect_fail "pre-push blocks a non-fast-forward push" git push -q --force origin task/007-push
 git switch -q main
+
+say "install safety"
+INSTALL="$SRC/dist/devloop-skill/install.sh"
+
+CUSTOM="$TMP/install-custom"
+mkdir -p "$CUSTOM/.githooks" "$CUSTOM/.github/workflows" "$CUSTOM/docs" "$CUSTOM/scripts/devloop"
+printf '#!/bin/sh\necho custom-pre-commit\n' > "$CUSTOM/.githooks/pre-commit"
+printf '#!/bin/sh\necho custom-commit-msg\n' > "$CUSTOM/.githooks/commit-msg"
+printf 'name: my-ci\non: [push]\n' > "$CUSTOM/.github/workflows/ci.yml"
+printf '# my lessons\n- keep me\n' > "$CUSTOM/docs/LESSONS.md"
+printf '#!/bin/sh\necho deploy\n' > "$CUSTOM/scripts/devloop/deploy.sh"
+git -C "$CUSTOM" init -q -b main
+git -C "$CUSTOM" config user.name t; git -C "$CUSTOM" config user.email t@x.invalid
+git -C "$CUSTOM" add -A; git -C "$CUSTOM" commit -q -m "chore: custom repo"
+OUT="$( cd "$CUSTOM" && bash "$INSTALL" 2>&1 )"; CODE=$?
+[ "$CODE" -ne 0 ] && ok "installer refuses to overwrite a kit file" || ko "installer refuses to overwrite a kit file"
+printf '%s' "$OUT" | grep -q "refusing to overwrite" \
+  && ok "refusal names the conflicting files" || ko "refusal names the conflicting files"
+grep -q custom-pre-commit "$CUSTOM/.githooks/pre-commit" && ok "custom hook preserved by refusal" || ko "custom hook preserved by refusal"
+grep -q custom-commit-msg "$CUSTOM/.githooks/commit-msg" && ok "conflicting hook untouched by refusal" || ko "conflicting hook untouched by refusal"
+grep -q "name: my-ci" "$CUSTOM/.github/workflows/ci.yml" && ok "custom workflow preserved" || ko "custom workflow preserved"
+grep -q "keep me" "$CUSTOM/docs/LESSONS.md" && ok "custom lessons preserved" || ko "custom lessons preserved"
+[ -f "$CUSTOM/scripts/devloop/deploy.sh" ] && ok "custom script preserved by refusal" || ko "custom script preserved by refusal"
+
+OUT="$( cd "$CUSTOM" && bash "$INSTALL" --force 2>&1 )"; CODE=$?
+[ "$CODE" -eq 0 ] && ok "installer --force succeeds" || ko "installer --force succeeds"
+COMMON="$(git -C "$CUSTOM" rev-parse --path-format=absolute --git-common-dir)"
+BACKUPS="$(find "$COMMON/devloop" -maxdepth 1 -type d -name 'backup-*' 2>/dev/null | head -1)"
+[ -n "$BACKUPS" ] && ok "force install keeps a backup" || ko "force install keeps a backup"
+[ -f "$BACKUPS/.githooks/commit-msg" ] && ok "backup contains the replaced hook" || ko "backup contains the replaced hook"
+[ -f "$CUSTOM/.githooks/pre-commit" ] && ok "unknown hook is not deleted by force" || ko "unknown hook is not deleted by force"
+[ -f "$CUSTOM/scripts/devloop/deploy.sh" ] && ok "unknown script is not deleted by force" || ko "unknown script is not deleted by force"
+[ -f "$CUSTOM/.github/workflows/ci.yml" ] && [ -f "$CUSTOM/.github/workflows/devloop-ci.yml" ] \
+  && ok "workflow installs as devloop-ci.yml next to the existing ci.yml" \
+  || ko "workflow installs as devloop-ci.yml next to the existing ci.yml"
+[ -f "$CUSTOM/scripts/devloop/gate.sh" ] && ok "kit installed after force" || ko "kit installed after force"
+
+FRESH="$TMP/install-fresh"
+mkdir -p "$FRESH"
+git -C "$FRESH" init -q -b main
+OUT="$( cd "$FRESH" && bash "$INSTALL" 2>&1 )"; CODE=$?
+[ "$CODE" -eq 0 ] && ok "installer succeeds in a fresh repo" || ko "installer succeeds in a fresh repo"
+[ -f "$FRESH/.devloop.conf" ] && ok "fresh install writes .devloop.conf" || ko "fresh install writes .devloop.conf"
+[ -f "$FRESH/scripts/devloop/gate.sh" ] && ok "fresh install writes the kit scripts" || ko "fresh install writes the kit scripts"
+[ -f "$FRESH/.github/workflows/devloop-ci.yml" ] && ok "fresh install writes devloop-ci.yml" || ko "fresh install writes devloop-ci.yml"
+grep -q "last_verified_sha: unset" "$FRESH/docs/STATE.md" \
+  && ok "fresh STATE is a neutral template" || ko "fresh STATE is a neutral template"
+grep -q "Append only" "$FRESH/docs/LESSONS.md" \
+  && ok "fresh LESSONS is a template, not the kit history" || ko "fresh LESSONS is a template, not the kit history"
+[ "$(git -C "$FRESH" config --get core.hooksPath)" = ".githooks" ] \
+  && ok "fresh install configures core.hooksPath" || ko "fresh install configures core.hooksPath"
 
 say "doctor without evidence"
 new_branch task/008-nogate

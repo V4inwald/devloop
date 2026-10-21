@@ -3,7 +3,7 @@ name: ci
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'task/**']
 
 permissions:
   contents: read
@@ -15,24 +15,30 @@ concurrency:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "24"
       - name: Gate (same script as local)
         # The runner context is not available in jobs.<job_id>.env; step env is.
         env:
           DEVLOOP_ARTIFACTS: ${{ runner.temp }}/devloop
         run: bash scripts/devloop/gate.sh
-      - name: Policy (commit hygiene, secrets, test weakening)
-        if: github.event_name == 'pull_request'
-        run: bash scripts/devloop/policy.sh "${{ github.event.pull_request.base.sha }}"
+      - name: Policy (commits, secrets, test weakening)
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          case "$base" in
+            ""|0000000000000000000000000000000000000000) base="$(git rev-parse HEAD~1 2>/dev/null || echo HEAD)" ;;
+          esac
+          bash scripts/devloop/policy.sh --strict "$base"
       - name: Upload gate evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gate-evidence
           path: ${{ runner.temp }}/devloop/
