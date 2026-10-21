@@ -203,7 +203,7 @@ if [ "$PR_MODE" -eq 1 ]; then
   REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)" || die "cannot resolve GitHub repo"
 
   git push -u origin "$BRANCH" || die "cannot push $BRANCH to origin"
-  PR_NUM="$(gh pr list --head "$BRANCH" --base "$MAIN_BRANCH" --json number --jq '.[0].number // empty')"
+  PR_NUM="$(gh pr list --head "$BRANCH" --base "$MAIN_BRANCH" --state open --json number --jq '.[0].number // empty')"
   if [ -z "$PR_NUM" ]; then
     PR_BODY="$(printf 'Task: %s\nReviewed-by: %s\nReviewed-blob: %s\nGate: %s\n' \
       "$TASK" "$REVIEW_FILE" "$REVIEW_BLOB" "$SHA")"
@@ -215,9 +215,16 @@ if [ "$PR_MODE" -eq 1 ]; then
     PR_URL="$(gh pr view "$PR_NUM" --json url -q .url)"
   fi
 
-  CHECKS="$(gh pr checks "$PR_NUM" --json name,state 2>/dev/null || true)"
-  [ -n "$CHECKS" ] && [ "$CHECKS" != "[]" ] \
-    || die "no CI checks reported on the PR; enable the workflow before using --pr"
+  # Check runs are created asynchronously after the PR event: wait for the
+  # suite to register instead of racing it and merging without CI.
+  CHECKS_READY=0
+  for _ in $(seq 1 24); do
+    CHECKS="$(gh pr checks "$PR_NUM" --json name 2>/dev/null || true)"
+    if [ -n "$CHECKS" ] && [ "$CHECKS" != "[]" ]; then CHECKS_READY=1; break; fi
+    sleep 5
+  done
+  [ "$CHECKS_READY" -eq 1 ] \
+    || die "no CI checks appeared on the PR after 2 minutes; enable the workflow before using --pr"
   echo "devloop: waiting for the required checks on PR #$PR_NUM ($PR_URL)"
   timeout "${CI_WAIT_SECONDS:-1800}" gh pr checks "$PR_NUM" --watch --fail-fast \
     || die "PR checks failed or timed out; the PR was not merged"

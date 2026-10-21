@@ -17,7 +17,8 @@ required checks, merges via GitHub, then gates the GitHub merge commit locally.
 
 ## Acceptance criteria
 
-- [x] AC1: `integrate.sh --pr` pushes the branch, opens/reuses a PR, waits for the checks, merges with `gh pr merge --merge --delete-branch`, gates the GitHub merge commit locally, updates the local `main`, and records `mode: pr`. `--pr` and `--push` are mutually exclusive; `REQUIRE_PR=true` refuses a local integration.
+- [x] AC1: `integrate.sh --pr` pushes the branch, opens/reuses an open PR, waits for the check suite to register, waits for the checks, merges with `gh pr merge --merge`, deletes the remote branch separately, gates the GitHub merge commit locally, updates the local `main`, and records `mode: pr`. `--pr` and `--push` are mutually exclusive; `REQUIRE_PR=true` refuses a local integration.
+  - Note (round 2): `--delete-branch` was removed because its local cleanup can fail after a successful remote merge; the remote branch is deleted with a non-fatal command. The check-registration poll was added after reviewing the PR path: check runs are created asynchronously.
 - [x] AC2: `scripts/devloop/protect.sh` builds a protection payload requiring the `gate` check, direct-push denial and admin enforcement, forbidding force-push/deletion; `--dry-run` is tested without network.
 - [x] AC3: `.github/CODEOWNERS` names the contract paths; `.devloop.conf` sets `REQUIRE_PR=true` and `REQUIRE_CI=true`.
 - [x] AC4: SKILL, AGENTS, dev-cycle, README and design/04 describe PR mode, the protection, and the bookkeeping path (`state/<sha>` PR) when direct pushes are blocked; the bundle is refreshed and drift-tested.
