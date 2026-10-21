@@ -25,6 +25,9 @@ setup() {
   mkdir -p "$REPO"
   cp -a "$SRC/AGENTS.md" "$SRC/.agents" "$SRC/scripts" "$SRC/.githooks" "$SRC/.github" \
         "$SRC/docs" "$REPO/"
+  # The kit's own verdicts and task contracts are history, not fixture data:
+  # keeping them would make the fixture's first review a modification.
+  rm -f "$REPO"/docs/reviews/*.md "$REPO"/docs/tasks/task-*.md
   cd "$REPO" || exit 1
   git init -q -b main
   git config user.name "devloop test"
@@ -65,16 +68,43 @@ EOF
 
 new_branch() { git switch -q -c "$1" main; }
 
-write_review() { # <file> <sha> <verdict> <blockers>
+# Start a task branch with a committed contract: integrate.sh refuses without one.
+start_task() { # <id> <slug> [implementer]
+  git switch -q main
+  git switch -q -c "task/$2"
+  mkdir -p docs/tasks
+  cat > "docs/tasks/$1.md" <<EOF
+---
+id: $1
+status: review
+branch: task/$2
+created: 2026-10-21
+owner: test
+implementer: ${3:-implementer-a}
+---
+# $1
+
+## Acceptance criteria
+
+- [ ] AC1: fixture
+EOF
+  git add "docs/tasks/$1.md"
+  git commit -q -m "docs(tasks): add $1"
+}
+
+write_review() { # <file> <sha> <verdict> <blockers> [task] [reviewer] [extra]
+  local task="${5:-task-001}" reviewer="${6:-test-harness}" extra="${7:-}"
   mkdir -p docs/reviews
   cat > "$1" <<EOF
 ---
-task: task-001
+task: $task
 sha: $2
 verdict: $3
 blockers: $4
-reviewer: test-harness
+reviewer: $reviewer
+contract: n/a
 date: 2026-10-21
+$extra
 ---
 
 ## Evidence
@@ -117,7 +147,7 @@ expect_fail "commit-msg rejects a non-conventional subject" git commit -q -m "ba
 git reset -q --hard HEAD
 git clean -qfd
 
-git switch -q -c task/001-multiply
+start_task task-001 001-multiply
 cat >> src/math.js <<'EOF'
 
 export function multiply(a, b) {
@@ -182,15 +212,17 @@ expect_fail "integrate refuses a review for an unknown SHA" bash scripts/devloop
 
 say "happy path"
 HEAD_NOW="$(git rev-parse HEAD)"
-write_review docs/reviews/task-001-r2.md "$HEAD_NOW" approve 0
+write_review docs/reviews/task-001-r2.md "$HEAD_NOW" approve 0 task-001
 bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
 expect_ok "integrate accepts clean gate + approving review" bash scripts/devloop/integrate.sh --task task-001
+[ "$(git rev-parse --abbrev-ref HEAD)" = "task/001-multiply" ] \
+  && ok "integration leaves the task branch checked out" || ko "integration leaves the task branch checked out"
 CONTENT="$(git show main:src/math.js)"
 case "$CONTENT" in
   *multiply*) ok "merged commit contains the change" ;;
   *) ko "merged commit contains the change" ;;
 esac
-MERGED_SHA="$(git rev-parse HEAD)"
+MERGED_SHA="$(git rev-parse main)"
 LOG="$(git log --oneline main)"
 case "$LOG" in
   *"chore(merge)"*) ok "merge commit uses the conventional subject" ;;
@@ -198,7 +230,19 @@ case "$LOG" in
 esac
 [ -f "$ART_DIR/integrations/$MERGED_SHA.json" ] \
   && ok "integration audit record created" || ko "integration audit record created"
+[ -f "$ART_DIR/gate/$MERGED_SHA/result.json" ] \
+  && ok "merge commit has its own gate result" || ko "merge commit has its own gate result"
+if jq -e '.ok == true and .dirty == false' "$ART_DIR/gate/$MERGED_SHA/result.json" >/dev/null 2>&1; then
+  ok "merge gate passed on a clean tree"
+else
+  ko "merge gate passed on a clean tree"
+fi
+[ -n "$(jq -r '.merge_gate // empty' "$ART_DIR/integrations/$MERGED_SHA.json")" ] \
+  && ok "integration record names the merge gate" || ko "integration record names the merge gate"
+git log -1 --format=%B main | grep -q "Reviewed-blob:" \
+  && ok "merge commit records the review blob" || ko "merge commit records the review blob"
 
+git switch -q main
 say "doctor"
 expect_ok "doctor accepts main after an integration" bash scripts/devloop/doctor.sh
 D_OUT="$(bash scripts/devloop/doctor.sh 2>&1)"; D_CODE=$?
@@ -213,17 +257,9 @@ case "$D_OUT" in
 esac
 
 say "merge gate evidence"
-MERGE_SHA="$(git rev-parse main)"
-MGATE="$ART_DIR/gate/$MERGE_SHA/result.json"
-mkdir -p "$(dirname "$MGATE")"
-jq -n --arg sha "$MERGE_SHA" '{sha:$sha,ok:true,dirty:false,checks:[]}' > "$MGATE"
-REC="$ART_DIR/integrations/$MERGE_SHA.json"
-jq --arg mg "$MGATE" '.merge_gate=$mg' "$REC" > "$REC.tmp" && mv "$REC.tmp" "$REC"
 D_OUT="$(bash scripts/devloop/doctor.sh 2>&1)"
 printf '%s' "$D_OUT" | grep -q "merge commit has a passing clean gate result" \
-  && ok "doctor reads merge gate evidence" || ko "doctor reads merge gate evidence"
-jq 'del(.merge_gate)' "$REC" > "$REC.tmp" && mv "$REC.tmp" "$REC"
-rm -rf "$ART_DIR/gate/$MERGE_SHA"
+  && ok "doctor reads the merge gate produced by integrate" || ko "doctor reads the merge gate produced by integrate"
 
 say "legacy artifact store"
 LEGACY="$REPO/.devloop/artifacts"
@@ -279,13 +315,13 @@ CODE_SIZE="$(bash -c '. ./scripts/devloop/common.sh; diff_lines "$1"' _ "$BASE_S
 git switch -q main
 
 say "size limit"
-new_branch task/004-big
+start_task task-004 004-big
 node -e 'let s=""; for (let i=0;i<450;i++) s += `export const v${i} = ${i};\n`; process.stdout.write(s)' > src/big.js
 git add -A
 git commit -q -m "feat(big): add generated constants"
 bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
 BIG_SHA="$(git rev-parse HEAD)"
-write_review docs/reviews/task-004-r1.md "$BIG_SHA" approve 0
+write_review docs/reviews/task-004-r1.md "$BIG_SHA" approve 0 task-004
 bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
 OUT="$(bash scripts/devloop/integrate.sh --task task-004 2>&1 || true)"
 printf '%s' "$OUT" | grep -q "MAX_DIFF_LINES" \
@@ -293,17 +329,257 @@ printf '%s' "$OUT" | grep -q "MAX_DIFF_LINES" \
 git switch -q main
 
 say "review freshness"
-new_branch task/005-late
+start_task task-005 005-late
 printf '\nexport const late = 1;\n' >> src/math.js
 git commit -qam "feat(math): add late constant"
 bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
 R5="$(git rev-parse HEAD)"
-write_review docs/reviews/task-005-r1.md "$R5" approve 0
+write_review docs/reviews/task-005-r1.md "$R5" approve 0 task-005
 bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
 printf '\nexport const later = 2;\n' >> src/math.js
 git commit -qam "feat(math): add later constant"
 bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
 expect_fail "code committed after review invalidates the approval" bash scripts/devloop/integrate.sh --task task-005
+git switch -q main
+
+say "task contract"
+start_task task-010 010-cross
+printf 'export const ten = 10;\n' > src/ten.js
+git add -A
+git commit -q -m "feat(ten): add ten"
+S10="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+write_review docs/reviews/task-999-r1.md "$S10" approve 0 task-999
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+expect_fail "integrate refuses a review for another task" bash scripts/devloop/integrate.sh --task task-010
+git switch -q main
+
+new_branch task/011-notask
+printf 'export const eleven = 11;\n' > src/eleven.js
+git add -A
+git commit -q -m "feat(eleven): add eleven"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+expect_fail "integrate refuses a branch with no task file" bash scripts/devloop/integrate.sh --task task-011
+git switch -q main
+
+start_task task-012 012-self
+printf 'export const twelve = 12;\n' > src/twelve.js
+git add -A
+git commit -q -m "feat(twelve): add twelve"
+S12="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+write_review docs/reviews/task-012-r1.md "$S12" approve 0 task-012 self
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+expect_fail "integrate refuses an unapproved self review" bash scripts/devloop/integrate.sh --task task-012
+write_review docs/reviews/task-012-r2.md "$S12" approve 0 task-012 self "approved_by: human"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+expect_ok "integrate accepts a self review with human approval" bash scripts/devloop/integrate.sh --task task-012
+git switch -q main
+
+start_task task-013 013-tamper
+printf 'export const thirteen = 13;\n' > src/thirteen.js
+git add -A
+git commit -q -m "feat(thirteen): add thirteen"
+S13="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+write_review docs/reviews/task-013-r1.md "$S13" approve 0 task-013
+printf 'export const thirteen_b = 1;\n' > src/thirteen_b.js
+git add -A
+git commit -q -m "feat(thirteen): add a second file"
+S13B="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+sed -i "s/^sha: .*/sha: $S13B/" docs/reviews/task-013-r1.md
+git commit -q -am "docs(reviews): refresh task-013 verdict"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+expect_fail "integrate refuses a review rewritten after approval" bash scripts/devloop/integrate.sh --task task-013
+git switch -q main
+
+start_task task-014 014-contract
+printf '\n# contract probe\n' >> scripts/devloop/common.sh
+printf 'export const fourteen = 14;\n' > src/fourteen.js
+git add -A
+git commit -q -m "chore(devloop): touch the contract"
+S14="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+write_review docs/reviews/task-014-r1.md "$S14" approve 0 task-014
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+OUT="$(bash scripts/devloop/integrate.sh --task task-014 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "contract paths" \
+  && ok "integrate refuses a contract change without approval" || ko "integrate refuses a contract change without approval"
+git switch -q main
+
+start_task task-015 015-fm
+printf 'export const fifteen = 15;\n' > src/fifteen.js
+git add -A
+git commit -q -m "feat(fifteen): add fifteen"
+S15="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+mkdir -p docs/reviews
+cat > docs/reviews/task-015-r1.md <<EOF
+---
+task: task-015
+sha: $S15
+verdict: approve
+blockers: 0
+reviewer: test-harness
+date: 2026-10-21
+---
+## Evidence
+| A | fixture |
+EOF
+git add docs/reviews
+git commit -q -m "docs(reviews): approve task-015"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+expect_ok "integrate tolerates a review without a contract field" bash scripts/devloop/integrate.sh --task task-015
+git switch -q main
+
+start_task task-016 016-contract-empty
+printf '\nCONTRACT_PATHS_DEFAULT=""\nCONTRACT_PATHS=""\n' >> .devloop.conf
+printf '\n# contract probe 2\n' >> scripts/devloop/common.sh
+printf 'export const sixteen = 16;\n' > src/sixteen.js
+git add -A
+git commit -q -m "chore(devloop): empty the contract paths"
+S16="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+write_review docs/reviews/task-016-r1.md "$S16" approve 0 task-016
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+OUT="$(bash scripts/devloop/integrate.sh --task task-016 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "contract paths" \
+  && ok "contract defaults cannot be disabled by the branch" || ko "contract defaults cannot be disabled by the branch"
+git switch -q main
+
+say "worktree integration"
+git switch -q -c scratch/wt-base main
+WT_MAIN="$TMP/wt-main"
+WT_TASK="$TMP/wt-task"
+git worktree add -q "$WT_MAIN" main
+git worktree add -q -b task/020-wt "$WT_TASK" main
+(
+  cd "$WT_TASK" || exit 1
+  mkdir -p docs/tasks
+  cat > docs/tasks/task-020.md <<'EOF'
+---
+id: task-020
+status: review
+branch: task/020-wt
+created: 2026-10-21
+owner: test
+implementer: implementer-a
+---
+# task-020
+EOF
+  git add docs/tasks/task-020.md
+  git commit -q -m "docs(tasks): add task-020"
+  printf 'export const twenty = 20;\n' > src/twenty.js
+  git add -A
+  git commit -q -m "feat(twenty): add twenty"
+  S20="$(git rev-parse HEAD)"
+  bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+  write_review docs/reviews/task-020-r1.md "$S20" approve 0 task-020
+  bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+  bash scripts/devloop/integrate.sh --task task-020 >/dev/null 2>&1
+  if [ "$(git rev-parse --abbrev-ref HEAD)" = "task/020-wt" ]; then echo "WT_BRANCH_OK"; else echo "WT_BRANCH_BAD"; fi
+) > "$TMP/wt.out" 2>&1
+grep -q WT_BRANCH_OK "$TMP/wt.out" \
+  && ok "worktree integration leaves the caller on its branch" || ko "worktree integration leaves the caller on its branch"
+[ "$(git -C "$WT_MAIN" rev-parse HEAD)" = "$(git rev-parse main)" ] \
+  && ok "main worktree fast-forwarded to the merge commit" || ko "main worktree fast-forwarded to the merge commit"
+[ -f "$ART_DIR/gate/$(git rev-parse main)/result.json" ] \
+  && ok "worktree merge result is gated" || ko "worktree merge result is gated"
+git worktree remove --force "$WT_TASK" >/dev/null 2>&1
+git worktree remove --force "$WT_MAIN" >/dev/null 2>&1
+git switch -q main
+
+say "bookkeeping doctor"
+printf '\n<!-- bookkeeping probe -->\n' >> docs/STATE.md
+git add docs/STATE.md
+git commit -q -m "chore(state): probe bookkeeping evidence"
+D_OUT="$(bash scripts/devloop/doctor.sh 2>&1)"; D_CODE=$?
+if [ "$D_CODE" -eq 0 ]; then ok "doctor accepts a bookkeeping commit"
+else ko "doctor accepts a bookkeeping commit"; printf '%s\n' "$D_OUT" | sed 's/^/    /'; fi
+printf '%s' "$D_OUT" | grep -q "bookkeeping commit" \
+  && ok "doctor names the bookkeeping commit" || ko "doctor names the bookkeeping commit"
+
+say "merge gate failure"
+git switch -q main
+MAIN_BEFORE="$(git rev-parse main)"
+git switch -q -c task/030-mergefail
+mkdir -p docs/tasks
+cat > docs/tasks/task-030.md <<'EOF'
+---
+id: task-030
+status: review
+branch: task/030-mergefail
+created: 2026-10-21
+owner: test
+implementer: implementer-a
+---
+# task-030
+EOF
+git add docs/tasks/task-030.md
+git commit -q -m "docs(tasks): add task-030"
+printf 'export const thirty = 30;\n' > src/thirty.js
+cat > test/thirty.test.js <<'EOF'
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { add } from "../src/math.js";
+
+test("the merged add contract", () => {
+  assert.equal(add(2, 3), 5);
+});
+EOF
+git add -A
+git commit -q -m "feat(thirty): add thirty and pin add semantics"
+S30="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+write_review docs/reviews/task-030-r1.md "$S30" approve 0 task-030
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+git switch -q main
+sed -i 's/return a + b;/return a - b;/' src/math.js
+git commit -qam "fix(math): change add semantics on main"
+MAIN_AFTER="$(git rev-parse main)"
+git switch -q task/030-mergefail
+OUT="$(bash scripts/devloop/integrate.sh --task task-030 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "merge result failed the gate" \
+  && ok "a failing merge gate is reported" || ko "a failing merge gate is reported"
+[ "$(git rev-parse main)" = "$MAIN_AFTER" ] \
+  && ok "a failing merge gate leaves main untouched" || ko "a failing merge gate leaves main untouched"
+git switch -q main
+git reset -q --hard "$MAIN_BEFORE"
+
+say "bookkeeping fail-closed"
+git switch -q -c task/031-ff
+mkdir -p docs/tasks
+cat > docs/tasks/task-031.md <<'EOF'
+---
+id: task-031
+status: review
+branch: task/031-ff
+created: 2026-10-21
+owner: test
+implementer: implementer-a
+---
+# task-031
+EOF
+git add docs/tasks/task-031.md
+git commit -q -m "docs(tasks): add task-031"
+printf 'export const thirtyone = 31;\n' > src/thirtyone.js
+git add -A
+git commit -q -m "feat(thirtyone): add thirtyone"
+S31="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+write_review docs/reviews/task-031-r1.md "$S31" approve 0 task-031
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+git switch -q main
+git merge -q --ff-only task/031-ff
+printf '\n<!-- bookkeeping ff probe -->\n' >> docs/STATE.md
+git add docs/STATE.md
+git commit -q -m "chore(state): probe bookkeeping over a non-integration tip"
+D_OUT="$(bash scripts/devloop/doctor.sh 2>&1)"; D_CODE=$?
+[ "$D_CODE" -ne 0 ] && ok "doctor refuses a bookkeeping commit over a non-integration tip" \
+  || ko "doctor refuses a bookkeeping commit over a non-integration tip"
+printf '%s' "$D_OUT" | grep -q "not an integration merge" \
+  && ok "doctor names the missing integration" || ko "doctor names the missing integration"
 git switch -q main
 
 say "policy"
