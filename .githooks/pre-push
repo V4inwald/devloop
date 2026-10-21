@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Block direct pushes to protected branches and non-fast-forward pushes.
-# Bypass with --no-verify (possible); branch protection must also be on.
+#
+# The protection decision must NOT be readable from the branch being pushed:
+# it comes from the environment or from git config (local, never cloned), not
+# from .devloop.conf. `git push --no-verify` can still bypass this hook; the
+# only non-bypassable protection is branch protection/rulesets on the server.
 set -euo pipefail
 
-[ -f .devloop.conf ] && . .devloop.conf
-PROTECTED_BRANCHES="${PROTECTED_BRANCHES:-main master}"
+# Defaults cannot be removed: they are prepended to whatever the environment
+# or the local git config provides.
+PROTECTED_BRANCHES="main master ${PROTECTED_BRANCHES:-$(git config --get devloop.protectedBranches 2>/dev/null || true)}"
 ALLOW_MAIN_PUSH="${ALLOW_MAIN_PUSH:-0}"
 
 zero="0000000000000000000000000000000000000000"
@@ -15,7 +20,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   for b in $PROTECTED_BRANCHES; do
     if [ "$remote_ref" = "refs/heads/$b" ] && [ "$ALLOW_MAIN_PUSH" != "1" ]; then
       echo "pre-push: direct push to $b is blocked. Open a task branch and a pull request." >&2
-      echo "pre-push: override for a deliberate release with ALLOW_MAIN_PUSH=1 git push ..." >&2
+      echo "pre-push: deliberate release only: ALLOW_MAIN_PUSH=1 git push ..." >&2
+      echo "pre-push: .devloop.conf is ignored here on purpose (a branch must not unlock itself)." >&2
       exit 1
     fi
   done

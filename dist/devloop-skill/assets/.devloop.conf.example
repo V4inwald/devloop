@@ -1,0 +1,12 @@
+# devloop configuration. Copy to .devloop.conf and edit the CHECK_* commands.
+# Every non-empty CHECK_<name> runs in gate.sh; <name> is the check label.
+# Commands run with `eval` from the repository root: treat this file as code.
+
+CHECK_TEST="node --test"
+CHECK_LINT="node --check src/*.js"
+CHECK_BUILD=""
+
+MAIN_BRANCH="main"
+MAX_DIFF_LINES="400"
+REQUIRE_CI="false"
+PROTECTED_BRANCHES="main master"
