@@ -222,8 +222,9 @@ if [ "$PR_MODE" -eq 1 ]; then
   timeout "${CI_WAIT_SECONDS:-1800}" gh pr checks "$PR_NUM" --watch --fail-fast \
     || die "PR checks failed or timed out; the PR was not merged"
 
-  gh pr merge "$PR_NUM" --merge --delete-branch \
+  gh pr merge "$PR_NUM" --merge \
     || die "gh pr merge failed (required checks, protection, or conflict)"
+  git push origin --delete "$BRANCH" >/dev/null 2>&1 || true
   MERGE_SHA="$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')" \
     || die "cannot read the merge commit"
   [ -n "$MERGE_SHA" ] || die "GitHub did not report a merge commit"

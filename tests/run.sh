@@ -692,6 +692,10 @@ printf '%s' "$PROTECT_OUT" | grep -q '"allow_force_pushes": false' \
   && ok "protect forbids force-push" || ko "protect forbids force-push"
 printf '%s' "$PROTECT_OUT" | grep -q '"enforce_admins": true' \
   && ok "protect enforces the rules for admins" || ko "protect enforces the rules for admins"
+printf '%s' "$PROTECT_OUT" | grep -q '"required_approving_review_count": 0' \
+  && ok "protect requires a pull request (zero approvals)" || ko "protect requires a pull request (zero approvals)"
+printf '%s' "$PROTECT_OUT" | grep -q '"allow_deletions": false' \
+  && ok "protect forbids branch deletion" || ko "protect forbids branch deletion"
 expect_fail "integrate refuses --pr with --push" \
   bash scripts/devloop/integrate.sh --task task-001 --pr --push --dry-run
 printf 'REQUIRE_PR="true"\n' > "$TMP/require-pr.conf"

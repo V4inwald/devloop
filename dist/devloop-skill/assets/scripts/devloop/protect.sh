@@ -43,7 +43,7 @@ PAYLOAD="$(jq -n \
   --argjson admins "$ENFORCE_ADMINS" \
   '{required_status_checks:{strict:false,contexts:[$ctx]},
     enforce_admins:$admins,
-    required_pull_request_reviews:(if $approvals > 0 then {required_approving_review_count:$approvals,dismiss_stale_reviews:true} else null end),
+    required_pull_request_reviews:{required_approving_review_count:$approvals,dismiss_stale_reviews:true},
     restrictions:null,
     allow_force_pushes:false,
     allow_deletions:false,
