@@ -182,6 +182,12 @@ syncs `main`. `protect.sh` installs/refreshes the protection (required `gate`, a
 enforced, no force-push or deletion). With protection on, the bookkeeping commit
 (`STATE.md`/`LESSONS.md`) also goes through a short `state/<sha>` PR; never hand-push `main`.
 
+Protection depends on the GitHub plan: **branch protection and rulesets are unavailable on a
+private repository on GitHub Free**. On that plan, the shipped `main-guard` workflow detects a
+push to `main` that is not a verified pull-request merge (issue + red job); it is detection,
+not prevention. Prevention requires a public repository or GitHub Pro/Team. The PR flow works
+either way and `REQUIRE_PR=true` stops the script from using local mode.
+
 ## Step 7 — record
 
 Update `docs/STATE.md` (`last_verified_sha` = the merge commit, focus, next

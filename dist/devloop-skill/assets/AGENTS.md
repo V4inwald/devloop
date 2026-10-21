@@ -58,9 +58,12 @@ Full procedure: skill `dev-cycle`. Review rubric: skill `code-review`. Task form
 
 When `REQUIRE_PR=true`, `integrate.sh --pr` is the only integration path: the branch is
 pushed, the required `gate` check must be green on the pull request, and GitHub merges it.
-`scripts/devloop/protect.sh` applies the branch protection (admins included). The
-bookkeeping exception still applies in substance, but it now travels through a short
-`state/<sha>` pull request because direct pushes to `main` are rejected.
+`scripts/devloop/protect.sh` applies the branch protection (admins included) **where the
+plan allows it**; GitHub Free cannot protect a private branch. On that plan the shipped
+`main-guard` workflow detects a non-PR push (issue + red job) but does not prevent it;
+prevention requires a public repository or GitHub Pro/Team. The bookkeeping exception still
+applies in substance, but it travels through a short `state/<sha>` pull request when
+protection (or `REQUIRE_PR=true`) is in force.
 
 ## 5. Memory map
 

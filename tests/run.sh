@@ -649,6 +649,8 @@ BACKUPS="$(find "$COMMON/devloop" -maxdepth 1 -type d -name 'backup-*' 2>/dev/nu
 [ -f "$CUSTOM/.github/workflows/ci.yml" ] && [ -f "$CUSTOM/.github/workflows/devloop-ci.yml" ] \
   && ok "workflow installs as devloop-ci.yml next to the existing ci.yml" \
   || ko "workflow installs as devloop-ci.yml next to the existing ci.yml"
+[ -f "$CUSTOM/.github/workflows/devloop-main-guard.yml" ] \
+  && ok "installer ships the main-guard workflow" || ko "installer ships the main-guard workflow"
 [ -f "$CUSTOM/scripts/devloop/gate.sh" ] && ok "kit installed after force" || ko "kit installed after force"
 
 FRESH="$TMP/install-fresh"
@@ -659,12 +661,24 @@ OUT="$( cd "$FRESH" && bash "$INSTALL" 2>&1 )"; CODE=$?
 [ -f "$FRESH/.devloop.conf" ] && ok "fresh install writes .devloop.conf" || ko "fresh install writes .devloop.conf"
 [ -f "$FRESH/scripts/devloop/gate.sh" ] && ok "fresh install writes the kit scripts" || ko "fresh install writes the kit scripts"
 [ -f "$FRESH/.github/workflows/devloop-ci.yml" ] && ok "fresh install writes devloop-ci.yml" || ko "fresh install writes devloop-ci.yml"
+[ -f "$FRESH/.github/workflows/devloop-main-guard.yml" ] && ok "fresh install writes devloop-main-guard.yml" || ko "fresh install writes devloop-main-guard.yml"
 grep -q "last_verified_sha: unset" "$FRESH/docs/STATE.md" \
   && ok "fresh STATE is a neutral template" || ko "fresh STATE is a neutral template"
 grep -q "Append only" "$FRESH/docs/LESSONS.md" \
   && ok "fresh LESSONS is a template, not the kit history" || ko "fresh LESSONS is a template, not the kit history"
 [ "$(git -C "$FRESH" config --get core.hooksPath)" = ".githooks" ] \
   && ok "fresh install configures core.hooksPath" || ko "fresh install configures core.hooksPath"
+
+say "main guard"
+GUARD="$SRC/.github/workflows/main-guard.yml"
+grep -q 'Merge pull request #' "$GUARD" \
+  && ok "guard verifies the pull-request merge subject" || ko "guard verifies the pull-request merge subject"
+grep -q 'gh issue create' "$GUARD" \
+  && ok "guard reports a direct push in an issue" || ko "guard reports a direct push in an issue"
+grep -q 'mergeCommit.oid' "$GUARD" \
+  && ok "guard checks the PR merge commit SHA" || ko "guard checks the PR merge commit SHA"
+diff -r "$SRC/.github/workflows" "$SRC/dist/devloop-skill/assets/.github/workflows" >/dev/null 2>&1 \
+  && ok "bundle workflows mirror the source" || ko "bundle workflows mirror the source"
 
 say "docs drift"
 if grep -rq '\.devloop/artifacts' "$SRC/AGENTS.md" "$SRC/README.md" "$SRC/scripts/devloop/packet.sh" "$SRC/.agents/skills" "$SRC/dist/devloop-skill/SKILL.md" 2>/dev/null; then
