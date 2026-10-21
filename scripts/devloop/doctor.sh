@@ -119,6 +119,9 @@ if [ -n "$FOUND" ]; then
 fi
 if [ "$BOOKKEEPING" -eq 1 ]; then
   ok "HEAD is a bookkeeping commit; evidence is verified at $EVIDENCE_SHA"
+  if [ -z "$INTEGRATION" ]; then
+    err "HEAD is a bookkeeping commit but $EVIDENCE_SHA is not an integration merge; refusing to certify"
+  fi
 fi
 
 if [ -n "$INTEGRATION" ]; then
@@ -156,7 +159,7 @@ if [ -n "$INTEGRATION" ]; then
   FILE_FOUND="$(review_covers "$REVIEWED")"
   if [ -n "$FILE_FOUND" ]; then ok "review file $FILE_FOUND covers the reviewed SHA"
   else err "no approving review file covers $REVIEWED"; fi
-else
+elif [ "$BOOKKEEPING" -eq 0 ]; then
   SRC="$(gate_source "$EVIDENCE_SHA")"
   [ "$SRC" = "legacy" ] && warn "gate evidence comes from the legacy store ($LEGACY_ART)"
   case "$(gate_state "$EVIDENCE_SHA")" in

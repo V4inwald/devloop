@@ -11,10 +11,15 @@ MAIN_BRANCH="main"
 MAX_DIFF_LINES="400"
 REQUIRE_CI="false"
 PROTECTED_BRANCHES="main master"
-CONTRACT_PATHS="${CONTRACT_PATHS:-.devloop.conf scripts/devloop .githooks .github/workflows AGENTS.md}"
+CONTRACT_PATHS_DEFAULT=".devloop.conf scripts/devloop .githooks .github/workflows AGENTS.md"
+CONTRACT_PATHS=""
 
 # shellcheck disable=SC1090
 [ -f "${DEVLOOP_CONF:-$ROOT/.devloop.conf}" ] && . "${DEVLOOP_CONF:-$ROOT/.devloop.conf}"
+
+# The default contract paths cannot be removed by the branch under review; a
+# project may add paths, never subtract the ones that protect the loop itself.
+CONTRACT_PATHS="$CONTRACT_PATHS_DEFAULT${CONTRACT_PATHS:+ $CONTRACT_PATHS}"
 
 # --- evidence store ---------------------------------------------------------
 # Artifacts live in the git common directory, not in the worktree. Two

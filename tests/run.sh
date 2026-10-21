@@ -433,6 +433,21 @@ bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
 expect_ok "integrate tolerates a review without a contract field" bash scripts/devloop/integrate.sh --task task-015
 git switch -q main
 
+start_task task-016 016-contract-empty
+printf '\nCONTRACT_PATHS=""\n' >> .devloop.conf
+printf '\n# contract probe 2\n' >> scripts/devloop/common.sh
+printf 'export const sixteen = 16;\n' > src/sixteen.js
+git add -A
+git commit -q -m "chore(devloop): empty the contract paths"
+S16="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+write_review docs/reviews/task-016-r1.md "$S16" approve 0 task-016
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+OUT="$(bash scripts/devloop/integrate.sh --task task-016 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "contract paths" \
+  && ok "contract defaults cannot be disabled by the branch" || ko "contract defaults cannot be disabled by the branch"
+git switch -q main
+
 say "worktree integration"
 git switch -q -c scratch/wt-base main
 WT_MAIN="$TMP/wt-main"
@@ -484,6 +499,88 @@ if [ "$D_CODE" -eq 0 ]; then ok "doctor accepts a bookkeeping commit"
 else ko "doctor accepts a bookkeeping commit"; printf '%s\n' "$D_OUT" | sed 's/^/    /'; fi
 printf '%s' "$D_OUT" | grep -q "bookkeeping commit" \
   && ok "doctor names the bookkeeping commit" || ko "doctor names the bookkeeping commit"
+
+say "merge gate failure"
+git switch -q main
+MAIN_BEFORE="$(git rev-parse main)"
+git switch -q -c task/030-mergefail
+mkdir -p docs/tasks
+cat > docs/tasks/task-030.md <<'EOF'
+---
+id: task-030
+status: review
+branch: task/030-mergefail
+created: 2026-10-21
+owner: test
+implementer: implementer-a
+---
+# task-030
+EOF
+git add docs/tasks/task-030.md
+git commit -q -m "docs(tasks): add task-030"
+printf 'export const thirty = 30;\n' > src/thirty.js
+cat > test/thirty.test.js <<'EOF'
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { add } from "../src/math.js";
+
+test("the merged add contract", () => {
+  assert.equal(add(2, 3), 5);
+});
+EOF
+git add -A
+git commit -q -m "feat(thirty): add thirty and pin add semantics"
+S30="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+write_review docs/reviews/task-030-r1.md "$S30" approve 0 task-030
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+git switch -q main
+sed -i 's/return a + b;/return a - b;/' src/math.js
+git commit -qam "fix(math): change add semantics on main"
+MAIN_AFTER="$(git rev-parse main)"
+git switch -q task/030-mergefail
+OUT="$(bash scripts/devloop/integrate.sh --task task-030 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "merge result failed the gate" \
+  && ok "a failing merge gate is reported" || ko "a failing merge gate is reported"
+[ "$(git rev-parse main)" = "$MAIN_AFTER" ] \
+  && ok "a failing merge gate leaves main untouched" || ko "a failing merge gate leaves main untouched"
+git switch -q main
+git reset -q --hard "$MAIN_BEFORE"
+
+say "bookkeeping fail-closed"
+git switch -q -c task/031-ff
+mkdir -p docs/tasks
+cat > docs/tasks/task-031.md <<'EOF'
+---
+id: task-031
+status: review
+branch: task/031-ff
+created: 2026-10-21
+owner: test
+implementer: implementer-a
+---
+# task-031
+EOF
+git add docs/tasks/task-031.md
+git commit -q -m "docs(tasks): add task-031"
+printf 'export const thirtyone = 31;\n' > src/thirtyone.js
+git add -A
+git commit -q -m "feat(thirtyone): add thirtyone"
+S31="$(git rev-parse HEAD)"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+write_review docs/reviews/task-031-r1.md "$S31" approve 0 task-031
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+git switch -q main
+git merge -q --ff-only task/031-ff
+printf '\n<!-- bookkeeping ff probe -->\n' >> docs/STATE.md
+git add docs/STATE.md
+git commit -q -m "chore(state): probe bookkeeping over a non-integration tip"
+D_OUT="$(bash scripts/devloop/doctor.sh 2>&1)"; D_CODE=$?
+[ "$D_CODE" -ne 0 ] && ok "doctor refuses a bookkeeping commit over a non-integration tip" \
+  || ko "doctor refuses a bookkeeping commit over a non-integration tip"
+printf '%s' "$D_OUT" | grep -q "not an integration merge" \
+  && ok "doctor names the missing integration" || ko "doctor names the missing integration"
+git switch -q main
 
 say "policy"
 new_branch task/006-policy
