@@ -16,3 +16,15 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
   → the stricter blocker wins; never average or cherry-pick verdicts.
 - 2026-10-21 (task-001): `runner` is step-scoped in GitHub Actions → never use `${{ runner.* }}`
   in `jobs.<id>.env`; the workflow fails validation before any job starts.
+- 2026-10-21 (task-002): gating the task branch is not gating the merge → always merge in a
+  detached worktree, run the gate on the merge result, then move `main`; semantics can conflict
+  even when the text does not.
+- 2026-10-21 (task-002): a "non-overridable" floor must be a literal assignment after the config
+  is sourced → any variable set before sourcing `.devloop.conf` can be emptied by the branch.
+- 2026-10-21 (task-002): doctor must fail closed on a bookkeeping commit whose parent is not an
+  integration merge → a gated+reviewed fast-forward tip otherwise passes without integration.
+- 2026-10-21 (task-002): the human explicitly authorized an oversized integration (677 > 400) →
+  record the exception in STATE/LESSONS, never pass `--allow-oversized` silently.
+- 2026-10-21 (process): two review rounds ended on a one-line blocker; a third delta review of
+  the fix is cheaper than merging a known hole → escalate, get the human authorization, then
+  review the delta (not the whole task) instead of abandoning the change.
