@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Gate (same script as local)
+        run: bash scripts/devloop/gate.sh
+      - name: Policy (commit hygiene, secrets, test weakening)
+        if: github.event_name == 'pull_request'
+        run: bash scripts/devloop/policy.sh "${{ github.event.pull_request.base.sha }}"
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-evidence
+          path: .devloop/artifacts/
+          if-no-files-found: warn

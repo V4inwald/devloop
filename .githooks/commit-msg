@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Reject commit subjects that do not follow Conventional Commits.
+# Bypassable with --no-verify by design; CI re-checks every commit in policy.sh.
+set -euo pipefail
+
+msg_file="$1"
+subject="$(head -n1 "$msg_file" | sed -E 's/[[:space:]]+$//')"
+
+# Git-generated messages are allowed.
+case "$subject" in
+  "Merge "*|Revert\ \"*|"fixup! "*|"squash! "*) exit 0 ;;
+esac
+
+CONVENTIONAL='^(feat|fix|docs|test|refactor|perf|build|ci|chore|revert)(\([a-z0-9./_-]+\))?!?: [a-z].{0,67}$'
+
+if ! printf '%s' "$subject" | grep -Eq "$CONVENTIONAL"; then
+  cat >&2 <<'EOF'
+commit-msg: invalid subject.
+  expected: type(scope): lowercase summary
+  types:    feat fix docs test refactor perf build ci chore revert
+  example:  feat(parser): handle nested quotes
+  limits:   72 characters, no trailing period
+EOF
+  exit 1
+fi
+
+if [ "${#subject}" -gt 72 ]; then
+  echo "commit-msg: subject is ${#subject} characters (max 72)." >&2
+  exit 1
+fi
+
+case "$subject" in
+  *.) echo "commit-msg: subject must not end with a period." >&2; exit 1 ;;
+esac
+
+exit 0
