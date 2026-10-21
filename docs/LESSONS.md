@@ -28,3 +28,9 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
 - 2026-10-21 (process): two review rounds ended on a one-line blocker; a third delta review of
   the fix is cheaper than merging a known hole → escalate, get the human authorization, then
   review the delta (not the whole task) instead of abandoning the change.
+- 2026-10-21 (task-003): local green is not CI green → test fixtures must unset the caller's
+  `DEVLOOP_ARTIFACTS`/`DEVLOOP_CONF`, and the first GitHub Actions run is the only proof the
+  workflow actually works; run it before claiming CI evidence.
+- 2026-10-21 (GitHub): authentication lives in `/workspace/.github-env` (account `V4inwald`),
+  and a new repository is **private by default**; the initial push to `main` needs the explicit
+  `ALLOW_MAIN_PUSH=1` release override, which is the hook working as designed.
