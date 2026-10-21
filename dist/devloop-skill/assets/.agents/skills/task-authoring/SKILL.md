@@ -19,6 +19,8 @@ A task may start only when all of these are true:
 4. **Size** — estimated diff lines. Above `MAX_DIFF_LINES` (default 400) → split now.
 5. **Risks** — what could break, and what evidence would catch it.
 6. **Dependencies** — other tasks or external state required first.
+7. **Contract impact** — does the change touch `.devloop.conf`, `scripts/devloop`,
+   `.githooks`, a workflow, or `AGENTS.md`? If yes, the review must say `contract: approved`.
 
 If any is missing, the correct action is to ask, not to guess.
 
@@ -33,6 +35,7 @@ status: ready        # draft | ready | in_progress | review | done | blocked
 branch: task/001-short-slug
 created: YYYY-MM-DD
 owner: <agent or human>
+implementer: <agent>
 ---
 
 # <short title>
@@ -94,7 +97,9 @@ beat one large unreviewable one.
 ## Status transitions
 
 `draft → ready → in_progress → review → done`, plus `blocked` with a reason and an owner.
-Only the Lead moves `review → done`, and only after `integrate.sh` succeeded.
+Only the Lead moves `review → done`, and only after `integrate.sh` succeeded. The task-file
+transition on `main` is not covered by the bookkeeping exception yet: settle it with an ADR or a
+follow-up task rather than editing the file directly on `main`.
 
 ## Anti-patterns
 

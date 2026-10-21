@@ -71,9 +71,9 @@ approbation humaine avant intégration.
 | Artefact | Emplacement | Durée de vie | Rôle |
 |---|---|---|---|
 | Fichier de tâche | `docs/tasks/<id>.md` | permanent | contrat : critères d'acceptation, périmètre, risque |
-| Résultat de gate | `.devloop/artifacts/gate/<sha>/result.json` | local, régénérable | preuve d'exécution des commandes du projet |
+| Résultat de gate | `.git/devloop/gate/<sha>/result.json` | local, régénérable | preuve d'exécution des commandes du projet |
 | Verdict de revue | `docs/reviews/<task>-rN.md` | versionné, immuable | preuve d'un regard indépendant, lié au SHA |
-| Enregistrement d'intégration | `.devloop/artifacts/integrations/<merge-sha>.json` | local | trace de ce qui a été fusionné, avec quel verdict |
+| Enregistrement d'intégration | `.git/devloop/integrations/<merge-sha>.json` | local | trace de ce qui a été fusionné, avec quel verdict |
 
 Les artefacts locaux ne sont pas commités (volume, bruit). Les verdicts le sont : ils racontent
 l'histoire du projet et permettent à la CI de vérifier qu'un merge a bien été revu.
