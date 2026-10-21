@@ -1,6 +1,6 @@
 ---
 id: task-009
-status: review
+status: done
 branch: task/009-final-hardening
 created: 2026-10-21
 owner: lead
@@ -46,3 +46,8 @@ rewrite, changing other projects' visibility.
 - A local-mode project installing the guard is protected by the runtime skip, but the checkout
   step still runs; the workflow comment explains it.
 - Task files are edited after integration by design; only status/checkboxes, never acceptance.
+
+## Notes / decisions
+
+- 2026-10-21: merged as PR #7; `main-guard` and `ci` are green on the merge. Closed under
+  ADR 0002 by the follow-up state PR.

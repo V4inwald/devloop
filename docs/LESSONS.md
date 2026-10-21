@@ -75,3 +75,10 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
 - 2026-10-21 (task-008): the plan limitation was solved by changing visibility,
   not by weakening the loop → keep the tool public and the projects private; the
   permission boundary is the repository, not the skill.
+- 2026-10-21 (task-009): a guard must be tested on its failure paths (stub `gh`,
+  API failure, wrong base, forged subject), not only on the happy path.
+- 2026-10-21 (task-009): close the loop explicitly — ADR 0002 lets the integrator
+  set `status: done` and the acceptance checkboxes in the bookkeeping PR; the
+  acceptance text stays immutable.
+- 2026-10-21 (task-009): a single CI trigger per PR is enough once the project is
+  in PR mode; the push-`task/**` trigger only duplicated the gate.
