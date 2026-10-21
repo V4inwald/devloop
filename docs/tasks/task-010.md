@@ -1,6 +1,6 @@
 ---
 id: task-010
-status: review
+status: done
 branch: task/010-doctor-task-bookkeeping
 created: 2026-10-21
 owner: lead
@@ -39,3 +39,8 @@ Touched: `scripts/devloop/doctor.sh`, `tests/run.sh`, `docs/tasks/task-010.md`, 
 - Any change under `docs/tasks/` is now accepted as bookkeeping; the process (ADR 0002) forbids
   editing acceptance text, but the doctor cannot enforce that distinction. The review of the
   state change covers it.
+
+## Notes / decisions
+
+- 2026-10-21: merged as PR #9; the state PR closes it under ADR 0002. The new doctor accepts the
+  state merge's STATE + task-file bookkeeping (0 errors).

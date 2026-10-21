@@ -1,14 +1,14 @@
 # STATE — current truth
 
 ```yaml
-last_verified_sha: 6366aabcbaa80252b5e8ced0ea23da8e1645ddae
+last_verified_sha: 0f778d270da6d15b96b7b72c6d9145933fee1e5b
 last_verified_at: 2026-10-21
 current_focus: maintenance; optional quality backlog
 ```
 
 ## Working now
 
-- task-001..009 are integrated and **done**. The loop has a shared artifact store,
+- task-001..010 are integrated and **done**. The loop has a shared artifact store,
   honest gate, committed task contract, review blob, contract floor, integration
   lock, merge gate, PR mode, single-run CI, branch protection, secret scanning,
   non-destructive install, aligned skill/team docs, a tracked bundle, and
@@ -21,8 +21,10 @@ current_focus: maintenance; optional quality backlog
   check), removed the duplicate `task/**` CI trigger, added ADR 0002 (task
   status/bookkeeping), and closed task-001..008. ADR 0002 governs closing
   task-009 in this state PR.
-- `bash tests/run.sh` = 119 assertions; doctor = 0 error. PR #7 (task-009) and
-  this bookkeeping PR are merged under the protection.
+- task-010 taught `doctor` to accept `docs/tasks/*.md` as bookkeeping (ADR 0002),
+  so a state PR that closes a task no longer demands a gate/review for the
+  bookkeeping merge. `bash tests/run.sh` = 119 assertions; doctor = 0 error.
+  PRs #7, #9 and this bookkeeping PR are merged under the protection.
 
 ## Next actions (optional quality backlog)
 

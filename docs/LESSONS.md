@@ -82,3 +82,8 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
   acceptance text stays immutable.
 - 2026-10-21 (task-009): a single CI trigger per PR is enough once the project is
   in PR mode; the push-`task/**` trigger only duplicated the gate.
+- 2026-10-21 (task-010): when a rule changes (ADR 0002), update the checker that
+  enforces the old rule; `doctor` rejected the very bookkeeping the ADR allowed
+  until its path regex was extended.
+- 2026-10-21 (task-010): test the checker against the real failing state, not
+  only the happy path — reverting the doctor reproduced the 2 errors.
