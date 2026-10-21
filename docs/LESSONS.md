@@ -68,3 +68,10 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
 - 2026-10-21 (process): `git add -A` in a workspace that also contains harness
   artifacts (`.plugin-work/`) swept 2 700 unrelated lines into a commit → stage
   explicit paths and inspect `git status` before committing.
+- 2026-10-21 (task-008): a public repository unlocks the real branch protection
+  and free secret scanning → audit the full history first, then switch, enable
+  push protection, apply `protect.sh`, and prove the direct-push rejection from
+  a scratch clone.
+- 2026-10-21 (task-008): the plan limitation was solved by changing visibility,
+  not by weakening the loop → keep the tool public and the projects private; the
+  permission boundary is the repository, not the skill.
