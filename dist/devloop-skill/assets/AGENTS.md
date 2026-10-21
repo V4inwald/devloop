@@ -20,8 +20,10 @@ the human; do not quietly pick one side.
 8. One task = one reviewable change. Stay under `MAX_DIFF_LINES`; split otherwise.
 
 Exception to rules 1–3: after an integration, the integrator may commit bookkeeping
-(`docs/STATE.md`, `docs/LESSONS.md`) directly to `main` with a `chore(state):` or `docs(state):`
-message. Nothing else is exempt, and the update must not touch code or tests.
+(`docs/STATE.md`, `docs/LESSONS.md`, and the integrated task file's `status` plus its acceptance
+checkboxes) directly to `main` with a `chore(state):`/`docs(state):` message when `main` is not
+protected, or through a `state/<sha>` pull request when it is. Acceptance text is never
+rewritten. Nothing else is exempt, and the update must not touch code or tests. See ADR 0002.
 
 ## 3. Evidence model
 

@@ -1,6 +1,6 @@
 ---
 id: task-005
-status: review
+status: done
 branch: task/005-skill-team
 created: 2026-10-21
 owner: lead

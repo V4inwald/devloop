@@ -1,6 +1,6 @@
 ---
 id: task-008
-status: review
+status: done
 branch: task/008-public
 created: 2026-10-21
 owner: lead
@@ -20,7 +20,7 @@ a free plan; `main` becomes merge-only through `--pr`.
 - [x] AC1: full-history audit (gitleaks over all refs + working tree, manual pattern and file-name checks, large-blob check) is documented and clean.
 - [x] AC2: `LICENSE` (MIT), `SECURITY.md`, `.gitignore` (secrets, `.devloop/`, `.plugin-work/`) and `docs/security/pre-public-audit.md` are added; current docs no longer expose the workspace auth path.
 - [x] AC3: tests assert the public-readiness files and ignore rules; `bash tests/run.sh` passes and the gate is clean.
-- [ ] AC4 (post-merge): the repository is public, secret scanning and push protection are enabled, `protect.sh` is applied, a direct push to `main` is rejected, and a bookkeeping PR is merged under the protection.
+- [x] AC4 (post-merge): the repository is public, secret scanning and push protection are enabled, `protect.sh` is applied, a direct push to `main` is rejected, and a bookkeeping PR is merged under the protection.
 
 ## Scope
 
@@ -49,3 +49,9 @@ backlog (task-009), changing the public/private policy of other projects.
   the process gate and `REQUIRED_APPROVALS=0`.
 - The home-lab and other private projects are not in this repository; the skill
   is a public tool, their data stays private.
+
+## Notes / decisions
+
+- 2026-10-21: the repository is public, branch protection is active (`gate`, admins, PR, no
+  force-push/deletion), secret scanning and push protection are enabled, and a direct push was
+  rejected from a scratch clone. AC4 is met; the task file is closed under ADR 0002.

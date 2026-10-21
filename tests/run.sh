@@ -677,8 +677,21 @@ grep -q 'gh issue create' "$GUARD" \
   && ok "guard reports a direct push in an issue" || ko "guard reports a direct push in an issue"
 grep -q 'mergeCommit.oid' "$GUARD" \
   && ok "guard checks the PR merge commit SHA" || ko "guard checks the PR merge commit SHA"
+grep -q 'REQUIRE_PR' "$GUARD" \
+  && ok "guard skips repositories not in PR mode" || ko "guard skips repositories not in PR mode"
+grep -q 'baseRefName' "$GUARD" && grep -q 'BASE_BRANCH' "$GUARD" \
+  && ok "guard checks the PR base branch" || ko "guard checks the PR base branch"
 diff -r "$SRC/.github/workflows" "$SRC/dist/devloop-skill/assets/.github/workflows" >/dev/null 2>&1 \
   && ok "bundle workflows mirror the source" || ko "bundle workflows mirror the source"
+grep -q 'branches: \[main\]' "$SRC/.github/workflows/ci.yml" && ! grep -q 'task/\*\*' "$SRC/.github/workflows/ci.yml" \
+  && ok "CI no longer runs twice per task branch" || ko "CI no longer runs twice per task branch"
+diff -r "$SRC/.githooks" "$SRC/dist/devloop-skill/assets/.githooks" >/dev/null 2>&1 \
+  && ok "bundle hooks mirror the source" || ko "bundle hooks mirror the source"
+MIRROR_OK=1
+for f in docs/tasks/TEMPLATE.md docs/reviews/TEMPLATE.md docs/adr/0000-template.md docs/STATE.template.md docs/LESSONS.template.md; do
+  diff -q "$SRC/$f" "$SRC/dist/devloop-skill/assets/$f" >/dev/null 2>&1 || MIRROR_OK=0
+done
+[ "$MIRROR_OK" -eq 1 ] && ok "bundle docs templates mirror the source" || ko "bundle docs templates mirror the source"
 
 say "docs drift"
 if grep -rq '\.devloop/artifacts' "$SRC/AGENTS.md" "$SRC/README.md" "$SRC/scripts/devloop/packet.sh" "$SRC/.agents/skills" "$SRC/dist/devloop-skill/SKILL.md" 2>/dev/null; then

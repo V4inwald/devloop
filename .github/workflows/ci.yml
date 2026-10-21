@@ -3,7 +3,9 @@ name: ci
 on:
   pull_request:
   push:
-    branches: [main, 'task/**']
+    # Pull requests cover task branches; add a task-branch trigger here only
+    # if you use local mode with REQUIRE_CI (the default is PR mode).
+    branches: [main]
 
 permissions:
   contents: read

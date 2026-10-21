@@ -1,6 +1,6 @@
 ---
 id: task-006
-status: review
+status: done
 branch: task/006-github-arbiter
 created: 2026-10-21
 owner: lead
@@ -23,7 +23,7 @@ required checks, merges via GitHub, then gates the GitHub merge commit locally.
 - [x] AC3: `.github/CODEOWNERS` names the contract paths; `.devloop.conf` sets `REQUIRE_PR=true` and `REQUIRE_CI=true`.
 - [x] AC4: SKILL, AGENTS, dev-cycle, README and design/04 describe PR mode, the protection, and the bookkeeping path (`state/<sha>` PR) when direct pushes are blocked; the bundle is refreshed and drift-tested.
 - [x] AC5: `bash tests/run.sh` passes and the gate is clean.
-- [ ] AC6 (post-merge): this task is merged through `--pr`, `protect.sh` is applied, a direct push to `main` is rejected, and a bookkeeping PR is merged; results recorded in STATE.
+- [x] AC6 (post-merge): this task is merged through `--pr`, `protect.sh` is applied, a direct push to `main` is rejected, and a bookkeeping PR is merged; results recorded in STATE.
 
 ## Scope
 
@@ -54,3 +54,9 @@ Out of scope: AC-as-code, mutation checks and extra linters (task-007).
 - The first `--pr` run is the real validation; the local suite cannot execute
   GitHub.
 - Protection is applied only after this task is merged (bootstrap order).
+
+## Notes / decisions
+
+- 2026-10-21: AC6 became true after task-008 made the repository public and applied
+  `protect.sh`; a direct push was rejected from a scratch clone. The task file is closed under
+  ADR 0002.

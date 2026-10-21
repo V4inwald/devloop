@@ -1,6 +1,6 @@
 ---
 id: task-002
-status: review
+status: done
 branch: task/002-integrate
 created: 2026-10-21
 owner: lead
