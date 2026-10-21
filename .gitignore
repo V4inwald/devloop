@@ -1,0 +1,14 @@
+# Local devloop evidence (the new store lives inside .git; this is the legacy path)
+.devloop/
+
+# Harness/plugin scratch directories
+.plugin-work/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_ed25519

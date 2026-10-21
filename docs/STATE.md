@@ -62,7 +62,6 @@ current_focus: decide private/public, then task-008 hardening
 ## Environment notes
 
 - git 2.47.3, node 24, jq 1.7, flock, timeout.
-- GitHub: `source /workspace/.github-env`; `XDG_CACHE_HOME=/tmp/gh-cache` for
-  `gh`. Account `V4inwald`, private repo, Free plan (no private branch
+- GitHub: the workspace GitHub environment is sourced outside the repository; `gh` uses a writable cache directory. Account `V4inwald`, private repo, Free plan (no private branch
   protection). `main-guard` and `ci` are active.
 - Full check: `bash scripts/devloop/gate.sh` (LINT + 110 tests).
