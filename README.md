@@ -61,7 +61,7 @@ Détail et règles d'écriture : `design/03-memory.md`.
 
 ## Ce qui est vérifié dans ce dépôt
 
-- `bash tests/run.sh` : **90 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
+- `bash tests/run.sh` : **102 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
   kit, et vérifie les refus réels : commit hors convention, absence de revue, revue pour un SHA
   inconnu, revue invalidée par un commit de code, arbre sale, diff trop gros, gate rouge, push
   direct sur `main`, push non fast-forward, `--no-verify` rattrapé par `policy.sh`.
@@ -70,6 +70,22 @@ Détail et règles d'écriture : `design/03-memory.md`.
 - `AGENTS.md` racine est bien injecté comme consignes de l'espace de travail.
 - Le workflow GitHub Actions **a été exécuté** sur le dépôt privé
   `https://github.com/V4inwald/devloop` : gate, policy `--strict` et upload d'artefacts verts.
+
+## GitHub arbitre
+
+Quand `REQUIRE_PR=true` :
+
+```bash
+bash scripts/devloop/protect.sh   # gate requis, admins inclus, pas de force-push
+bash scripts/devloop/integrate.sh --task <id> --pr
+```
+
+`--pr` pousse la branche, ouvre/retrouve la PR, attend le check requis `gate`, merge via
+`gh pr merge`, **gate le commit de merge GitHub localement**, puis synchronise `main`. La
+protection interdit le push direct, y compris pour l'admin : le bookkeeping (`STATE.md`,
+`LESSONS.md`) passe par une courte PR `state/<sha>`. Avec un seul compte GitHub, aucune
+approbation GitHub n'est exigée (on ne peut pas approuver sa propre PR) ; la revue
+fichier `docs/reviews/` reste le gate de processus.
 
 ## Publication
 

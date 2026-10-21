@@ -10,6 +10,7 @@ cd "$ROOT"
 MAIN_BRANCH="main"
 MAX_DIFF_LINES="400"
 REQUIRE_CI="false"
+REQUIRE_PR="false"
 PROTECTED_BRANCHES="main master"
 CONTRACT_PATHS=""
 

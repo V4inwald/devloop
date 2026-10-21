@@ -50,11 +50,17 @@ An agent saying "tests pass" is not evidence. The artifact is.
 | 3. Implement | small commits, conventional messages | code + tests |
 | 4. Gate | `bash scripts/devloop/gate.sh` | `<sha>/result.json` (exit 3 = dirty, not integrable) |
 | 5. Review | `bash scripts/devloop/packet.sh`, then a separate reviewer writes `docs/reviews/<task>-r1.md` | verdict + blob |
-| 6. Integrate | `bash scripts/devloop/integrate.sh --task <id>` | gated merge commit + audit record |
+| 6. Integrate | `bash scripts/devloop/integrate.sh --task <id> [--pr]` | gated merge commit + audit record |
 | 7. Record | update `docs/STATE.md`; add a lesson or ADR if a decision was made | durable state |
 
 Full procedure: skill `dev-cycle`. Review rubric: skill `code-review`. Task format: skill
 `task-authoring`.
+
+When `REQUIRE_PR=true`, `integrate.sh --pr` is the only integration path: the branch is
+pushed, the required `gate` check must be green on the pull request, and GitHub merges it.
+`scripts/devloop/protect.sh` applies the branch protection (admins included). The
+bookkeeping exception still applies in substance, but it now travels through a short
+`state/<sha>` pull request because direct pushes to `main` are rejected.
 
 ## 5. Memory map
 
@@ -77,7 +83,7 @@ Do not copy details into `AGENTS.md`. It must stay small enough to be read at ev
 - Commits: Conventional Commits, imperative, lowercase summary, ≤72 characters.
 - One logical change per commit; tests live in the commit that needs them.
 - Commit body: why, not what. Reference `task-<id>` in the body when useful.
-- Merge commits are created by `integrate.sh`, never hand-crafted.
+- Merge commits are created by `integrate.sh` or by the GitHub PR merge, never hand-crafted.
 
 ## 7. Review
 

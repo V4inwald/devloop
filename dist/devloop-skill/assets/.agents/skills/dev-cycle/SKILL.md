@@ -100,7 +100,7 @@ existed at the reviewed SHA, and pins the review blob in the integration record.
 
 ```bash
 bash scripts/devloop/integrate.sh --task <id> --dry-run   # checks first
-bash scripts/devloop/integrate.sh --task <id> [--allow-oversized] [--push]
+bash scripts/devloop/integrate.sh --task <id> [--allow-oversized] [--push|--pr]
 ```
 
 It refuses without a committed task contract, a clean passing gate for HEAD, and an approving
@@ -113,6 +113,12 @@ afterwards. A failing merge gate leaves `main` untouched. Integrations are seria
 `--push` uses `ALLOW_MAIN_PUSH=1` in the environment only; `.devloop.conf` is ignored by the
 pre-push hook. If it refuses, fix the cause; a manual merge is out of the contract.
 
+If `REQUIRE_PR=true` (protected `main`), use `--pr`: it pushes the branch, opens/reuses a PR,
+waits for the required `gate` check, merges via `gh pr merge`, gates the GitHub merge commit
+locally, and syncs `main`. Run `scripts/devloop/protect.sh` once to apply/refresh the
+protection. The bookkeeping update (`STATE.md`/`LESSONS.md`) goes through a small
+`state/<sha>` PR because direct pushes are rejected.
+
 ## Step 7 — record memory
 
 After the merge:
@@ -121,6 +127,9 @@ After the merge:
 2. Append a line to `docs/LESSONS.md` if something was learned.
 3. Write an ADR (`docs/adr/`) if a decision will constrain future work.
 4. Mark the task file `done` (see the transition note in the task-authoring skill).
+5. With `REQUIRE_PR=true`, push the STATE/LESSONS update on a `state/<sha>` branch, open a PR,
+   let the `gate` check pass and merge it with `gh pr merge`; a direct push to `main` is
+   rejected by the branch protection.
 
 ## Failure handling
 
