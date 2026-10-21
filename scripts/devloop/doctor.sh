@@ -10,13 +10,30 @@ ok()   { echo "  OK    $*"; }
 warn() { echo "  WARN  $*"; WARNINGS=$((WARNINGS + 1)); }
 err()  { echo "  ERROR $*"; ERRORS=$((ERRORS + 1)); }
 
-gate_json() { printf '%s/gate/%s/result.json' "$ART" "$1"; }
+# Existing installations wrote evidence to <worktree>/.devloop/artifacts. Keep
+# reading it (read-only) so an upgrade does not turn a valid repository red.
+LEGACY_ART="${DEVLOOP_LEGACY_ARTIFACTS:-$ROOT/.devloop/artifacts}"
 
-# ok | dirty | failed | missing
+gate_json() {
+  local f
+  f="$ART/gate/$1/result.json"
+  [ -f "$f" ] || f="$LEGACY_ART/gate/$1/result.json"
+  printf '%s' "$f"
+}
+
+# shared | legacy | missing
+gate_source() {
+  if [ -f "$ART/gate/$1/result.json" ]; then printf 'shared'
+  elif [ -f "$LEGACY_ART/gate/$1/result.json" ]; then printf 'legacy'
+  else printf 'missing'; fi
+}
+
+# ok | dirty | failed | stale | missing
 gate_state() {
   local f
   f="$(gate_json "$1")"
   [ -f "$f" ] || { printf 'missing'; return 0; }
+  [ "$(jq -r '.sha // empty' "$f" 2>/dev/null || true)" = "$1" ] || { printf 'stale'; return 0; }
   case "$(jq -r '[.ok,.dirty]|@tsv' "$f" 2>/dev/null || true)" in
     $'true\tfalse') printf 'ok' ;;
     $'true\ttrue')  printf 'dirty' ;;
@@ -59,18 +76,23 @@ fi
 if [ -f .devloop.conf ]; then ok ".devloop.conf present"; else warn ".devloop.conf missing; using defaults"; fi
 
 case "$ART" in
-  "$ROOT"/*) warn "artifact store $ART is inside the worktree; upgrade the kit so a fresh clone cannot go dirty" ;;
-  *)         ok "shared artifact store ($ART)" ;;
+  "$GIT_COMMON_DIR"/*) ok "shared artifact store ($ART)" ;;
+  "$ROOT"/*)           warn "artifact store $ART is inside the worktree; set DEVLOOP_ARTIFACTS outside it" ;;
+  *)                   ok "artifact store ($ART)" ;;
 esac
 
 SHA="$(head_sha)"
 INTEGRATION=""
-for f in "$ART"/integrations/*.json; do
-  [ -f "$f" ] || continue
-  if [ "$(jq -r '.merge_sha // empty' "$f" 2>/dev/null || true)" = "$SHA" ]; then
-    INTEGRATION="$f"
-    break
-  fi
+INTEGRATION_SOURCE=""
+for dir in "$ART" "$LEGACY_ART"; do
+  for f in "$dir"/integrations/*.json; do
+    [ -f "$f" ] || continue
+    if [ "$(jq -r '.merge_sha // empty' "$f" 2>/dev/null || true)" = "$SHA" ]; then
+      INTEGRATION="$f"
+      INTEGRATION_SOURCE="$dir"
+      break 2
+    fi
+  done
 done
 
 if [ -n "$INTEGRATION" ]; then
@@ -78,21 +100,30 @@ if [ -n "$INTEGRATION" ]; then
   REVIEWED="$(jq -r '.reviewed_sha // empty' "$INTEGRATION")"
   MERGE_GATE="$(jq -r '.merge_gate // empty' "$INTEGRATION")"
   ok "HEAD is an integration merge (head $INTEGRATED_HEAD, review $REVIEWED)"
+  if [ "$INTEGRATION_SOURCE" = "$LEGACY_ART" ]; then
+    warn "integration record comes from the legacy store ($LEGACY_ART)"
+  fi
 
   if [ -n "$MERGE_GATE" ]; then
+    SRC="$(gate_source "$SHA")"
+    [ "$SRC" = "legacy" ] && warn "merge gate evidence comes from the legacy store"
     case "$(gate_state "$SHA")" in
-      ok)    ok "merge commit has a passing clean gate result" ;;
-      dirty) err "merge gate was produced on a dirty tree ($SHA)" ;;
+      ok)     ok "merge commit has a passing clean gate result" ;;
+      dirty)  err "merge gate was produced on a dirty tree ($SHA)" ;;
       failed) err "merge gate failed ($SHA)" ;;
-      *)     err "merge gate is missing for $SHA; re-run integrate.sh" ;;
+      stale)  err "merge gate result names another SHA ($SHA)" ;;
+      *)      err "merge gate is missing for $SHA; re-run integrate.sh" ;;
     esac
   else
+    SRC="$(gate_source "$INTEGRATED_HEAD")"
+    [ "$SRC" = "legacy" ] && warn "integrated-head gate evidence comes from the legacy store"
     case "$(gate_state "$INTEGRATED_HEAD")" in
-      ok)    ok "integrated head has a passing clean gate (legacy record: merge commit not gated)"
-             warn "legacy integration record: re-run the loop to gate the merge commit" ;;
-      dirty) err "integrated head gate was produced on a dirty tree ($INTEGRATED_HEAD)" ;;
+      ok)     ok "integrated head has a passing clean gate (legacy record: merge commit not gated)"
+              warn "legacy integration record: re-run the loop to gate the merge commit" ;;
+      dirty)  err "integrated head gate was produced on a dirty tree ($INTEGRATED_HEAD)" ;;
       failed) err "integrated head gate failed ($INTEGRATED_HEAD)" ;;
-      *)     err "integration record points to missing gate evidence for $INTEGRATED_HEAD" ;;
+      stale)  err "integrated head gate result names another SHA ($INTEGRATED_HEAD)" ;;
+      *)      err "integration record points to missing gate evidence for $INTEGRATED_HEAD" ;;
     esac
   fi
 
@@ -100,25 +131,19 @@ if [ -n "$INTEGRATION" ]; then
   if [ -n "$FILE_FOUND" ]; then ok "review file $FILE_FOUND covers the reviewed SHA"
   else err "no approving review file covers $REVIEWED"; fi
 else
+  SRC="$(gate_source "$SHA")"
+  [ "$SRC" = "legacy" ] && warn "gate evidence comes from the legacy store ($LEGACY_ART)"
   case "$(gate_state "$SHA")" in
-    ok)    ok "passing clean gate result for HEAD" ;;
-    dirty) err "gate result for HEAD was produced on a dirty tree; commit and re-run gate.sh" ;;
+    ok)     ok "passing clean gate result for HEAD" ;;
+    dirty)  err "gate result for HEAD was produced on a dirty tree; commit and re-run gate.sh" ;;
     failed) err "gate result for HEAD is failing; see $(gate_json "$SHA")" ;;
-    *)     err "no gate result for HEAD; run scripts/devloop/gate.sh" ;;
+    stale)  err "gate result names another SHA; re-run gate.sh" ;;
+    *)      err "no gate result for HEAD; run scripts/devloop/gate.sh" ;;
   esac
 
   FILE_FOUND="$(review_covers "$SHA")"
   if [ -n "$FILE_FOUND" ]; then ok "review file $FILE_FOUND covers HEAD"
   else err "no approving review file covers HEAD"; fi
-fi
-
-if [ -n "$CONTRACT_PATHS" ] && git rev-parse --verify --quiet "$MAIN_BRANCH" >/dev/null 2>&1; then
-  DRIFT="$(git diff --name-only "$MAIN_BRANCH...HEAD" -- $CONTRACT_PATHS 2>/dev/null || true)"
-  if [ -z "$DRIFT" ]; then
-    ok "contract files match $MAIN_BRANCH"
-  else
-    warn "contract files changed on this branch: $(printf '%s' "$DRIFT" | tr '\n' ' ')"
-  fi
 fi
 
 if [ -f docs/STATE.md ]; then

@@ -146,6 +146,13 @@ SHA1="$(git rev-parse HEAD)"
 [ "$(jq -r .dirty "$ART_DIR/gate/$SHA1/result.json")" = "false" ] \
   && ok "clean tree recorded as dirty=false" || ko "clean tree recorded as dirty=false"
 
+TMP_CONF="$TMP/function.conf"
+cp .devloop.conf "$TMP_CONF"
+printf '\nshell_fn_check() { return 0; }\nCHECK_FUNCTION="shell_fn_check"\n' >> "$TMP_CONF"
+expect_ok "gate evaluates shell functions from the configuration" \
+  env DEVLOOP_CONF="$TMP_CONF" bash scripts/devloop/gate.sh --quiet
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
+
 say "dirty gate"
 printf '// dirty\n' >> src/math.js
 D_OUT="$(bash scripts/devloop/gate.sh 2>&1)"; D_CODE=$?
@@ -194,6 +201,44 @@ esac
 
 say "doctor"
 expect_ok "doctor accepts main after an integration" bash scripts/devloop/doctor.sh
+D_OUT="$(bash scripts/devloop/doctor.sh 2>&1)"; D_CODE=$?
+[ "$D_CODE" -eq 0 ] && ok "doctor exits 0 on the integrated main" || ko "doctor exits 0 on the integrated main"
+case "$D_OUT" in
+  *"shared artifact store"*) ok "doctor recognizes the shared artifact store" ;;
+  *) ko "doctor recognizes the shared artifact store" ;;
+esac
+case "$D_OUT" in
+  *"inside the worktree"*) ko "doctor does not misreport the shared store" ;;
+  *) ok "doctor does not misreport the shared store" ;;
+esac
+
+say "merge gate evidence"
+MERGE_SHA="$(git rev-parse main)"
+MGATE="$ART_DIR/gate/$MERGE_SHA/result.json"
+mkdir -p "$(dirname "$MGATE")"
+jq -n --arg sha "$MERGE_SHA" '{sha:$sha,ok:true,dirty:false,checks:[]}' > "$MGATE"
+REC="$ART_DIR/integrations/$MERGE_SHA.json"
+jq --arg mg "$MGATE" '.merge_gate=$mg' "$REC" > "$REC.tmp" && mv "$REC.tmp" "$REC"
+D_OUT="$(bash scripts/devloop/doctor.sh 2>&1)"
+printf '%s' "$D_OUT" | grep -q "merge commit has a passing clean gate result" \
+  && ok "doctor reads merge gate evidence" || ko "doctor reads merge gate evidence"
+jq 'del(.merge_gate)' "$REC" > "$REC.tmp" && mv "$REC.tmp" "$REC"
+rm -rf "$ART_DIR/gate/$MERGE_SHA"
+
+say "legacy artifact store"
+LEGACY="$REPO/.devloop/artifacts"
+mkdir -p "$LEGACY"
+cp -a "$ART_DIR/." "$LEGACY/"
+rm -rf "$ART_DIR"
+D_OUT="$(bash scripts/devloop/doctor.sh 2>&1)"; D_CODE=$?
+if [ "$D_CODE" -eq 0 ]; then ok "doctor accepts a legacy artifact store"
+else ko "doctor accepts a legacy artifact store"; printf '%s\n' "$D_OUT" | sed 's/^/    /'; fi
+case "$D_OUT" in
+  *"legacy store"*) ok "doctor names the legacy store" ;;
+  *) ko "doctor names the legacy store" ;;
+esac
+rm -rf "$LEGACY"
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
 
 say "gate failures"
 git switch -q main
