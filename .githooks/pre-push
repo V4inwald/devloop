@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Block direct pushes to protected branches and non-fast-forward pushes.
+# Bypass with --no-verify (possible); branch protection must also be on.
+set -euo pipefail
+
+[ -f .devloop.conf ] && . .devloop.conf
+PROTECTED_BRANCHES="${PROTECTED_BRANCHES:-main master}"
+ALLOW_MAIN_PUSH="${ALLOW_MAIN_PUSH:-0}"
+
+zero="0000000000000000000000000000000000000000"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+
+  for b in $PROTECTED_BRANCHES; do
+    if [ "$remote_ref" = "refs/heads/$b" ] && [ "$ALLOW_MAIN_PUSH" != "1" ]; then
+      echo "pre-push: direct push to $b is blocked. Open a task branch and a pull request." >&2
+      echo "pre-push: override for a deliberate release with ALLOW_MAIN_PUSH=1 git push ..." >&2
+      exit 1
+    fi
+  done
+
+  if [ "$remote_sha" != "$zero" ]; then
+    if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+      echo "pre-push: non-fast-forward push to $remote_ref is blocked (rewriting shared history)." >&2
+      exit 1
+    fi
+  fi
+done
+
+exit 0
