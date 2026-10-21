@@ -2,7 +2,10 @@
 # Run every configured CHECK_* command against HEAD and record a SHA-bound result.
 #
 # Usage: gate.sh [--task <id>] [--quiet]
-# Exit:  0 all checks passed, 1 at least one failed, 2 config/usage error.
+# Exit:  0 all checks passed on a clean tree (integrable)
+#        1 at least one check failed
+#        2 config/usage error
+#        3 checks passed but the tree was dirty (NOT integrable)
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 need jq
 
@@ -64,12 +67,24 @@ jq -n \
   '{sha:$sha,branch:$branch,task:$task,dirty:$dirty,ok:$ok,checks:$checks,generated_at:$ts}' \
   > "$OUT/result.json"
 
+if [ "$OK" != true ]; then
+  if [ "$QUIET" -eq 0 ]; then
+    if [ "$DIRTY" = true ]; then
+      echo "devloop: gate FAILED on a dirty tree; fix the checks and commit before re-running."
+    else
+      echo "devloop: gate FAILED -> ${OUT#"$ROOT"/}/result.json"
+    fi
+  fi
+  exit 1
+fi
+
 if [ "$DIRTY" = true ]; then
-  echo "devloop: working tree is DIRTY; this result cannot be integrated until you commit and re-run."
+  if [ "$QUIET" -eq 0 ]; then
+    echo "devloop: gate UNVERIFIED (checks passed, dirty working tree); this result cannot be integrated."
+    echo "devloop: commit the work and re-run -> ${OUT#"$ROOT"/}/result.json"
+  fi
+  exit 3
 fi
-if [ "$OK" = true ]; then
-  [ "$QUIET" -eq 0 ] && echo "devloop: gate PASSED -> ${OUT#"$ROOT"/}/result.json"
-  exit 0
-fi
-[ "$QUIET" -eq 0 ] && echo "devloop: gate FAILED -> ${OUT#"$ROOT"/}/result.json"
-exit 1
+
+[ "$QUIET" -eq 0 ] && echo "devloop: gate PASSED -> ${OUT#"$ROOT"/}/result.json"
+exit 0

@@ -23,6 +23,9 @@ jobs:
         with:
           node-version: "22"
       - name: Gate (same script as local)
+        # The runner context is not available in jobs.<job_id>.env; step env is.
+        env:
+          DEVLOOP_ARTIFACTS: ${{ runner.temp }}/devloop
         run: bash scripts/devloop/gate.sh
       - name: Policy (commit hygiene, secrets, test weakening)
         if: github.event_name == 'pull_request'
@@ -32,5 +35,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gate-evidence
-          path: .devloop/artifacts/
+          path: ${{ runner.temp }}/devloop/
           if-no-files-found: warn
