@@ -8,7 +8,10 @@ CHECK_BUILD=""
 
 MAIN_BRANCH="main"
 MAX_DIFF_LINES="400"
+# GitHub arbitre: REQUIRE_PR=true forces --pr (branch protection required);
+# REQUIRE_CI=true makes the CI checks part of the evidence.
 REQUIRE_CI="false"
+REQUIRE_PR="false"
 # Used by integrate.sh (refuses to integrate from these branches).
 # pre-push ignores this file on purpose: use ALLOW_MAIN_PUSH=1 in the environment
 # for a deliberate release, never a repo-local override.

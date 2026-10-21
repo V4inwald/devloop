@@ -683,6 +683,26 @@ diff -q "$SRC/AGENTS.md" "$SRC/dist/devloop-skill/assets/AGENTS.md" >/dev/null 2
 diff -q "$SRC/.devloop.conf.example" "$SRC/dist/devloop-skill/assets/.devloop.conf.example" >/dev/null 2>&1 \
   && ok "bundle config example mirrors the source" || ko "bundle config example mirrors the source"
 
+say "github arbiter"
+PROTECT_OUT="$(bash scripts/devloop/protect.sh --dry-run 2>&1)"; PROTECT_CODE=$?
+[ "$PROTECT_CODE" -eq 0 ] && ok "protect --dry-run exits 0" || ko "protect --dry-run exits 0"
+printf '%s' "$PROTECT_OUT" | grep -q '"gate"' \
+  && ok "protect requires the gate check" || ko "protect requires the gate check"
+printf '%s' "$PROTECT_OUT" | grep -q '"allow_force_pushes": false' \
+  && ok "protect forbids force-push" || ko "protect forbids force-push"
+printf '%s' "$PROTECT_OUT" | grep -q '"enforce_admins": true' \
+  && ok "protect enforces the rules for admins" || ko "protect enforces the rules for admins"
+printf '%s' "$PROTECT_OUT" | grep -q '"required_approving_review_count": 0' \
+  && ok "protect requires a pull request (zero approvals)" || ko "protect requires a pull request (zero approvals)"
+printf '%s' "$PROTECT_OUT" | grep -q '"allow_deletions": false' \
+  && ok "protect forbids branch deletion" || ko "protect forbids branch deletion"
+expect_fail "integrate refuses --pr with --push" \
+  bash scripts/devloop/integrate.sh --task task-001 --pr --push --dry-run
+printf 'REQUIRE_PR="true"\n' > "$TMP/require-pr.conf"
+OUT="$(env DEVLOOP_CONF="$TMP/require-pr.conf" bash scripts/devloop/integrate.sh --task task-001 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "REQUIRE_PR=true" \
+  && ok "REQUIRE_PR refuses a local integration" || ko "REQUIRE_PR refuses a local integration"
+
 say "doctor without evidence"
 new_branch task/008-nogate
 printf '\nexport const n = 0;\n' >> src/math.js

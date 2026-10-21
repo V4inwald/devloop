@@ -114,6 +114,17 @@ commit de merge**, et ne déplace `main` que si ce résultat est vert. Un échec
 intact. Les intégrations sont sérialisées par un verrou ; le commit de merge porte
 `Reviewed-by:`, `Reviewed-blob:` et `Gate:`.
 
+## GitHub arbitre (protection de branche)
+
+Sur un dépôt protégé (`REQUIRE_PR=true`), `integrate.sh --pr` pousse la branche, ouvre une PR,
+attend le check requis `gate`, merge via `gh pr merge`, puis gate le commit de merge GitHub
+localement avant de synchroniser `main`. `protect.sh` applique la protection : check `gate`
+requis, `enforce_admins`, pas de force-push ni de suppression ; `strict:false` car la CI de
+PR teste déjà le commit de merge (`refs/pull/N/merge`). Le push direct sur `main` est refusé,
+y compris pour l'admin : le bookkeeping (`STATE.md`/`LESSONS.md`) passe par une PR
+`state/<sha>`. Avec un seul compte GitHub, `REQUIRED_APPROVALS=0` (auto-approbation
+impossible) ; la revue versionnée dans `docs/reviews/` reste le gate de processus.
+
 ## Contournements et réponses
 
 | Contournement | Réponse |

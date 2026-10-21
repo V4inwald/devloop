@@ -1,0 +1,9 @@
+# Contract paths: changes need the owner's review. Enforced only if branch
+# protection requires code owner reviews; with a single GitHub account that
+# would deadlock, so this file documents ownership and feeds the PR description.
+.devloop.conf            @V4inwald
+scripts/devloop/         @V4inwald
+.githooks/               @V4inwald
+.github/workflows/       @V4inwald
+AGENTS.md                @V4inwald
+docs/reviews/            @V4inwald

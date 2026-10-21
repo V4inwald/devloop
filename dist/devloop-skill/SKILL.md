@@ -154,7 +154,7 @@ Rules:
 
 ```bash
 bash scripts/devloop/integrate.sh --task <id> --dry-run
-bash scripts/devloop/integrate.sh --task <id> [--allow-oversized] [--push]
+bash scripts/devloop/integrate.sh --task <id> [--allow-oversized] [--push|--pr]
 ```
 
 It refuses unless **all** hold:
@@ -170,10 +170,17 @@ It refuses unless **all** hold:
 7. when `REQUIRE_CI=true`, GitHub checks are green for HEAD;
 8. the **merge result** passes the gate in a detached worktree.
 
-Integrations are serialized with a lock. `main` is fast-forwarded (or its ref is
-updated when it is not checked out); a failing merge gate leaves `main` untouched.
-`--push` pushes `main` with `ALLOW_MAIN_PUSH=1` in the environment only; the
-pre-push hook ignores `.devloop.conf` on purpose.
+Integrations are serialized with a lock. In local mode `main` is fast-forwarded (or its ref
+updated when it is not checked out); a failing merge gate leaves `main` untouched. `--push`
+pushes `main` with `ALLOW_MAIN_PUSH=1` in the environment only; the pre-push hook ignores
+`.devloop.conf` on purpose.
+
+On a protected repository (`REQUIRE_PR=true`), use `--pr` instead: it pushes the branch,
+opens or reuses a pull request, waits for the required `gate` check, merges with
+`gh pr merge --merge --delete-branch`, then **gates the GitHub merge commit locally** and
+syncs `main`. `protect.sh` installs/refreshes the protection (required `gate`, admins
+enforced, no force-push or deletion). With protection on, the bookkeeping commit
+(`STATE.md`/`LESSONS.md`) also goes through a short `state/<sha>` PR; never hand-push `main`.
 
 ## Step 7 — record
 
