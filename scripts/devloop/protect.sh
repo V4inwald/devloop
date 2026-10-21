@@ -55,8 +55,13 @@ if [ "$DRY" -eq 1 ]; then
   exit 0
 fi
 
-printf '%s' "$PAYLOAD" | gh api -X PUT "repos/$REPO/branches/$MAIN_BRANCH/protection" --input - >/dev/null \
-  || die "GitHub refused the protection update (admin? private repo? branch exists?)"
+if ! ERR="$(printf '%s' "$PAYLOAD" | gh api -X PUT "repos/$REPO/branches/$MAIN_BRANCH/protection" --input - 2>&1 >/dev/null)"; then
+  case "$ERR" in
+    *"Upgrade to GitHub Pro"*|*"make this repository public"*)
+      die "branch protection is unavailable for a private repository on GitHub Free. Options: keep it private and rely on main-guard (detection, not prevention), make the repository public, or upgrade to GitHub Pro/Team." ;;
+    *) die "GitHub refused the protection update: $ERR" ;;
+  esac
+fi
 
 echo "devloop: protected $REPO/$MAIN_BRANCH"
 gh api "repos/$REPO/branches/$MAIN_BRANCH/protection" \

@@ -61,7 +61,9 @@ targets() {
       docs/STATE.md) continue ;;
       docs/STATE.template.md) dst="docs/STATE.md" ;;
       docs/LESSONS.template.md) dst="docs/LESSONS.md" ;;
-      .github/workflows/*) dst=".github/workflows/devloop-ci.yml" ;;
+      .github/workflows/ci.yml) dst=".github/workflows/devloop-ci.yml" ;;
+      .github/workflows/main-guard.yml) dst=".github/workflows/devloop-main-guard.yml" ;;
+      .github/workflows/*) dst=".github/workflows/devloop-$(basename "$rel")" ;;
       *) dst="$rel" ;;
     esac
     printf '%s\t%s\n' "$rel" "$dst"

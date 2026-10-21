@@ -125,6 +125,12 @@ y compris pour l'admin : le bookkeeping (`STATE.md`/`LESSONS.md`) passe par une 
 `state/<sha>`. Avec un seul compte GitHub, `REQUIRED_APPROVALS=0` (auto-approbation
 impossible) ; la revue versionnée dans `docs/reviews/` reste le gate de processus.
 
+**Limite de plan** : GitHub Free refuse branch protection et rulesets sur un dépôt privé
+(HTTP 403). `protect.sh` le détecte et renvoie les options. Sur ce plan, le workflow
+`main-guard` détecte un push direct (commit de tête non merge de PR → issue + job rouge) :
+c'est une détection, pas une prévention. La prévention réelle exige un dépôt public ou
+GitHub Pro/Team ; le mode PR reste le chemin normal dans tous les cas.
+
 ## Contournements et réponses
 
 | Contournement | Réponse |

@@ -1,0 +1,53 @@
+name: main-guard
+
+# Detection control, not prevention: GitHub Free cannot protect a private
+# branch. If a push to main is not a verified pull-request merge, open an issue
+# and fail. Direct pushes are still possible; the only prevention is branch
+# protection (public repo or GitHub Pro/Team) applied with scripts/devloop/protect.sh.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify the push is a merged pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.after }}
+          ACTOR: ${{ github.actor }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          zero=0000000000000000000000000000000000000000
+          if [ "$SHA" = "$zero" ]; then
+            echo "branch deletion, nothing to check"
+            exit 0
+          fi
+          subject="$(gh api "repos/$REPO/commits/$SHA" --jq '.commit.message' | head -1)"
+          echo "head: $SHA"
+          echo "subject: $subject"
+          pr="$(printf '%s' "$subject" | sed -nE 's/^Merge pull request #([0-9]+) from .*/\1/p')"
+          reason=""
+          if [ -z "$pr" ]; then
+            reason="head is not a pull-request merge commit"
+          else
+            merged="$(gh pr view "$pr" --repo "$REPO" --json state,mergeCommit \
+              --jq '.state + " " + (.mergeCommit.oid // "")')"
+            case "$merged" in
+              "MERGED $SHA") echo "PR #$pr merged at $SHA"; exit 0 ;;
+              *) reason="PR #$pr does not name $SHA as its merge commit ($merged)" ;;
+            esac
+          fi
+          body="$(printf 'A push to `main` was not a verified pull-request merge.\n\n- head: `%s`\n- actor: `%s`\n- before: `%s`\n- reason: %s\n- commit: https://github.com/%s/commit/%s\n\nThis is a **detection** control: GitHub Free cannot protect a private branch. Inspect, revert if needed, and use `scripts/devloop/integrate.sh --pr`. Prevention requires branch protection (public repo or GitHub Pro/Team) applied with `scripts/devloop/protect.sh`.\n' "$SHA" "$ACTOR" "$BEFORE" "$reason" "$REPO" "$SHA")"
+          gh issue create --repo "$REPO" --title "Direct push detected on main: ${SHA:0:12}" --body "$body" || true
+          echo "::error::direct push detected: $reason"
+          exit 1
