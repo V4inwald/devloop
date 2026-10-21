@@ -4,7 +4,7 @@
 
 **Entrée** : HEAD, un arbre de travail, et `.devloop.conf`.
 
-**Sortie** : `.devloop/artifacts/gate/<sha>/result.json`
+**Sortie** : `.git/devloop/gate/<sha>/result.json`
 
 ```json
 {
@@ -106,13 +106,21 @@ C'est un détail qui paraît mineur et qui casse tout s'il est ignoré : la plup
 C'est pourquoi la CI, les tests d'intégration, et un humain sur les zones sensibles restent
 nécessaires. Le dispositif rend la fraude visible ; il ne rend pas le logiciel correct.
 
+## Le merge est gaté, pas seulement la branche
+
+Une branche peut passer ses tests et casser le résultat du merge (conflit sémantique). Depuis
+task-002, `integrate.sh` construit le merge dans un worktree détaché, exécute le gate **sur le
+commit de merge**, et ne déplace `main` que si ce résultat est vert. Un échec laisse `main`
+intact. Les intégrations sont sérialisées par un verrou ; le commit de merge porte
+`Reviewed-by:`, `Reviewed-blob:` et `Gate:`.
+
 ## Contournements et réponses
 
 | Contournement | Réponse |
 |---|---|
 | `git commit --no-verify` | `policy.sh` en CI revalide chaque message |
 | `git push --no-verify` sur main | branch protection côté serveur (à activer) |
-| éditer `result.json` | artefact local régénéré ; la CI produit le sien |
+| éditer `result.json` | artefact local régénéré ; `doctor` vérifie le `.sha`, et `integrate.sh` gate aussi le merge |
 | écrire un faux `approve` | rien ne l'empêche techniquement ; séparation de contexte, trace, échantillonnage humain |
 | vider `.devloop.conf` | modification visible en diff, revue ; la CI échoue si zéro check |
 | `integrate.sh --allow-oversized` | visible dans l'historique de commande et le diff |

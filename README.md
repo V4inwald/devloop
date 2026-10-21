@@ -11,14 +11,18 @@ cette affirmation en deux artefacts liés au commit : un résultat de gate et un
 ## Démarrage rapide
 
 ```bash
-# 1. copier le kit dans votre dépôt (AGENTS.md, .agents/, scripts/, .githooks/, .github/, docs/)
+# 1. voir ce que l'installateur ferait, puis l'installer (non destructif)
+bash dist/devloop-skill/install.sh --dry-run
+bash dist/devloop-skill/install.sh
 # 2. adapter les commandes de vérification
-cp .devloop.conf.example .devloop.conf && $EDITOR .devloop.conf
-# 3. installer les hooks (non versionnables)
-bash scripts/devloop/install-hooks.sh
-# 4. vérifier que tout est cohérent
+$EDITOR .devloop.conf
+# 3. vérifier que tout est cohérent
 bash scripts/devloop/doctor.sh
 ```
+
+L'installateur refuse d'écraser un fichier existant sans `--force` (sauvegarde sous
+`<git-common-dir>/devloop/backup-*`), ne supprime jamais un hook/script inconnu, et installe le
+workflow sous `.github/workflows/devloop-ci.yml` pour ne pas clobber un `ci.yml` existant.
 
 Première tâche :
 
@@ -37,9 +41,9 @@ bash scripts/devloop/integrate.sh --task task-001
 
 | Script | Rôle | Refuse quand |
 |---|---|---|
-| `gate.sh` | exécute les `CHECK_*` de `.devloop.conf`, écrit un JSON lié au SHA | une commande échoue, ou arbre sale (marqué non intégrable) |
+| `gate.sh` | exécute les `CHECK_*`, écrit un JSON lié au SHA dans `<git-common-dir>/devloop` | une commande échoue (exit 1), ou arbre sale (exit 3, `UNVERIFIED`) |
 | `packet.sh` | construit le paquet de revue (commits, diff, preuve de gate) | jamais (avertit si le diff est trop gros) |
-| `integrate.sh` | fusionne la branche de tâche dans `main` | gate absent/échoué/sale, revue absente ou périmée, diff trop gros, CI rouge |
+| `integrate.sh` | fusionne dans un worktree détaché, **gate le merge**, puis avance `main` | contrat de tâche absent/incohérent, gate/revue absents ou périmés, revue modifiée, contrat non approuvé, diff trop gros, CI rouge, merge gate rouge |
 | `policy.sh` | vérifie messages de commit, secrets, affaiblissement des tests | violation (utilisé en CI, non contournable par `--no-verify`) |
 | `doctor.sh` | diagnostic lecture seule de l'état du dépôt | erreur de preuve ou d'état |
 | `install-hooks.sh` | installe `core.hooksPath` et exclut `.devloop/` localement | — |
@@ -57,14 +61,21 @@ Détail et règles d'écriture : `design/03-memory.md`.
 
 ## Ce qui est vérifié dans ce dépôt
 
-- `bash tests/run.sh` : **29 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
+- `bash tests/run.sh` : **90 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
   kit, et vérifie les refus réels : commit hors convention, absence de revue, revue pour un SHA
   inconnu, revue invalidée par un commit de code, arbre sale, diff trop gros, gate rouge, push
   direct sur `main`, push non fast-forward, `--no-verify` rattrapé par `policy.sh`.
 - Les trois skills de `.agents/skills/` sont apparus dans le catalogue de la session DSH sans
   redémarrage : la découverte de skills telle que décrite par `dsh-skill-filesystem` fonctionne.
 - `AGENTS.md` racine est bien injecté comme consignes de l'espace de travail.
-- Le workflow GitHub Actions **n'a pas été exécuté** : aucun remote, `gh` non authentifié.
+- Le workflow GitHub Actions **a été exécuté** sur le dépôt privé
+  `https://github.com/V4inwald/devloop` : gate, policy `--strict` et upload d'artefacts verts.
+
+## Publication
+
+Le kit est publié **privé par défaut** : `gh repo create --private`. Ne le passer en public que
+sur demande explicite. L'authentification de ce workspace est dans `/workspace/.github-env`
+(compte `V4inwald`) ; ne jamais commiter `.gh` ni `.github-env`.
 
 ## Limites assumées
 
@@ -74,7 +85,7 @@ Détail et règles d'écriture : `design/03-memory.md`.
 - Les hooks git sont locaux : après un clone, il faut relancer `install-hooks.sh`. La CI est
   l'arbitre qui ne peut pas être contourné par `--no-verify`.
 - Le dispositif est optimisé pour 1 à 3 tâches simultanées ; au-delà, la coordination des
-  worktrees devient le goulot.
+  worktrees devient le goulot. Un seul intégrateur à la fois (verrou), un écrivain par worktree.
 - Le kit ne fournit pas de tests d'intégration : ajoutez `CHECK_INTEGRATION="..."` quand le
   projet a une base ou un service à démarrer.
 

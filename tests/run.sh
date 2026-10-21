@@ -666,6 +666,23 @@ grep -q "Append only" "$FRESH/docs/LESSONS.md" \
 [ "$(git -C "$FRESH" config --get core.hooksPath)" = ".githooks" ] \
   && ok "fresh install configures core.hooksPath" || ko "fresh install configures core.hooksPath"
 
+say "docs drift"
+if grep -rq '\.devloop/artifacts' "$SRC/AGENTS.md" "$SRC/README.md" "$SRC/scripts/devloop/packet.sh" "$SRC/.agents/skills" "$SRC/dist/devloop-skill/SKILL.md" 2>/dev/null; then
+  ko "hot docs no longer point at the old artifact store"
+else
+  ok "hot docs no longer point at the old artifact store"
+fi
+grep -q '## Team mode' "$SRC/dist/devloop-skill/SKILL.md" \
+  && ok "entry skill documents team mode" || ko "entry skill documents team mode"
+diff -r "$SRC/scripts/devloop" "$SRC/dist/devloop-skill/assets/scripts/devloop" >/dev/null 2>&1 \
+  && ok "bundle scripts mirror the source" || ko "bundle scripts mirror the source"
+diff -r "$SRC/.agents/skills" "$SRC/dist/devloop-skill/assets/.agents/skills" >/dev/null 2>&1 \
+  && ok "bundle skills mirror the source" || ko "bundle skills mirror the source"
+diff -q "$SRC/AGENTS.md" "$SRC/dist/devloop-skill/assets/AGENTS.md" >/dev/null 2>&1 \
+  && ok "bundle AGENTS mirrors the source" || ko "bundle AGENTS mirrors the source"
+diff -q "$SRC/.devloop.conf.example" "$SRC/dist/devloop-skill/assets/.devloop.conf.example" >/dev/null 2>&1 \
+  && ok "bundle config example mirrors the source" || ko "bundle config example mirrors the source"
+
 say "doctor without evidence"
 new_branch task/008-nogate
 printf '\nexport const n = 0;\n' >> src/math.js

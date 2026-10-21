@@ -3,7 +3,7 @@
 # The reviewer reads this file instead of reconstructing context with fresh commands.
 #
 # Usage: packet.sh [<base-rev>]
-# Output: .devloop/artifacts/review/<sha>-packet.md (path printed on stdout)
+# Output: .git/devloop/review/<sha>-packet.md (path printed on stdout)
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 need jq
 

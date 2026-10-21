@@ -1,7 +1,7 @@
 ---
 name: code-review
 description: Review one devloop packet and write a SHA-bound verdict file with blockers or approval. Use when asked to review a diff, a task branch, or a review packet for a repository.
-whenToUse: A packet exists in .devloop/artifacts/review/ or the user asks for a code review of a task branch.
+whenToUse: A packet exists in .git/devloop/review/ or the user asks for a code review of a task branch.
 ---
 
 # code-review — adversarial review with evidence
@@ -12,7 +12,7 @@ commit, so the verdict must name that commit.
 
 ## Inputs
 
-- Packet: `.devloop/artifacts/review/<sha>-packet.md` (commits, files, diff, gate evidence).
+- Packet: `.git/devloop/review/<sha>-packet.md` (commits, files, diff, gate evidence).
 - Task file: `docs/tasks/<id>.md` (acceptance criteria, scope).
 - Repository at the reviewed SHA. You may run commands; you may not edit code.
 
@@ -65,6 +65,7 @@ sha: <full 40-char sha of the reviewed HEAD>
 verdict: approve
 blockers: 0
 reviewer: <agent name or human>
+contract: approved | n/a
 date: YYYY-MM-DD
 ---
 
@@ -91,6 +92,11 @@ None.
 - `verdict: reject` is for a wrong approach that cannot be fixed inside the current task; explain
   what must change upstream.
 - A review file is immutable after commit. Change your mind → write round N+1.
+- The review file must be **added after** the reviewed commit, and must not be committed by the
+  reviewer. The Lead commits the final file; `integrate.sh` pins its blob and tolerates only
+  `A docs/reviews/` afterwards.
+- `contract: approved` is mandatory when the diff touches `.devloop.conf`, `scripts/devloop`,
+  `.githooks`, a workflow, or `AGENTS.md`; otherwise `n/a`.
 
 ## Anti-rubber-stamp rules
 

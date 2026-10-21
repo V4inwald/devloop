@@ -27,11 +27,17 @@ message. Nothing else is exempt, and the update must not touch code or tests.
 
 Evidence is bound to a commit SHA, not to a conversation:
 
-- `scripts/devloop/gate.sh` writes `.devloop/artifacts/gate/<sha>/result.json` and refuses to
-  count a dirty tree as passing.
-- A review file `docs/reviews/<task>-r<N>.md` names the exact `sha:` it approved.
-- `scripts/devloop/integrate.sh` merges only when both exist for HEAD. Code committed after
-  review invalidates the review (only additions under `docs/reviews/` are tolerated).
+- `scripts/devloop/gate.sh` writes `$(git rev-parse --git-common-dir)/devloop/gate/<sha>/result.json`.
+  The store is shared by every worktree and never sits inside the worktree. A dirty tree exits
+  3 and prints `UNVERIFIED`; it is never a passing result.
+- A review file `docs/reviews/<task>-r<N>.md` names the exact `sha:` it approved, its `task:`,
+  and `contract: approved` when the branch touches contract paths. The file must be **added
+  after** the reviewed commit; its blob is pinned in the integration record and the merge
+  trailers.
+- `scripts/devloop/integrate.sh` merges only when the committed task contract, the gate and the
+  review all cover HEAD. Code committed after review invalidates it (only additions under
+  `docs/reviews/` are tolerated). The merge result is gated in a detached worktree before
+  `main` moves.
 
 An agent saying "tests pass" is not evidence. The artifact is.
 
@@ -42,9 +48,9 @@ An agent saying "tests pass" is not evidence. The artifact is.
 | 1. Task | write `docs/tasks/<id>.md` | acceptance criteria + checks |
 | 2. Branch | `git switch -c task/<id>-<slug>` | isolated work |
 | 3. Implement | small commits, conventional messages | code + tests |
-| 4. Gate | `bash scripts/devloop/gate.sh` | `<sha>/result.json` |
-| 5. Review | `bash scripts/devloop/packet.sh`, then a separate reviewer writes `docs/reviews/<task>-r1.md` | verdict |
-| 6. Integrate | `bash scripts/devloop/integrate.sh --task <id>` | merge commit + audit record |
+| 4. Gate | `bash scripts/devloop/gate.sh` | `<sha>/result.json` (exit 3 = dirty, not integrable) |
+| 5. Review | `bash scripts/devloop/packet.sh`, then a separate reviewer writes `docs/reviews/<task>-r1.md` | verdict + blob |
+| 6. Integrate | `bash scripts/devloop/integrate.sh --task <id>` | gated merge commit + audit record |
 | 7. Record | update `docs/STATE.md`; add a lesson or ADR if a decision was made | durable state |
 
 Full procedure: skill `dev-cycle`. Review rubric: skill `code-review`. Task format: skill
@@ -76,10 +82,14 @@ Do not copy details into `AGENTS.md`. It must stay small enough to be read at ev
 ## 7. Review
 
 - The reviewer is a separate context from the implementer. Never approve your own diff.
-- Solo fallback: self-review is allowed only with `reviewer: self` in the verdict and explicit
-  human approval before integration.
+- The review file must be **added after** the reviewed commit and is never committed as a draft.
+  `integrate.sh` pins its blob; after the reviewed SHA only `A docs/reviews/` is tolerated.
+- The review declares `task:`, `sha:`, `reviewer:`, and `contract:` when the branch changes a
+  contract path. `reviewer: self` requires `approved_by:` and explicit human approval.
 - `approve` requires zero blockers. "Looks fine" without per-rubric evidence is not a review.
 - Maximum two review rounds; after that escalate to the human.
+- Team mode: one writer per worktree, one integrator at a time, one review per task. The review
+  file is the handoff artefact — never a chat message, never a shared draft.
 
 ## 8. Session start
 
@@ -102,6 +112,6 @@ State what you need, the options, and your recommendation. Do not guess silently
 
 - [ ] Task file status is `done`, acceptance criteria checked.
 - [ ] Gate passed on a clean tree for the reviewed SHA.
-- [ ] Review file approved that SHA with zero blockers.
-- [ ] Merge performed by `integrate.sh`.
+- [ ] Review file approved that SHA with zero blockers; its blob is recorded.
+- [ ] Merge performed by `integrate.sh`, and the merge result passed the gate.
 - [ ] `docs/STATE.md` updated; lesson or ADR recorded if applicable.
