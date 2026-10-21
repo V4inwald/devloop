@@ -2,7 +2,10 @@
 # Run every configured CHECK_* command against HEAD and record a SHA-bound result.
 #
 # Usage: gate.sh [--task <id>] [--quiet]
-# Exit:  0 all checks passed, 1 at least one failed, 2 config/usage error.
+# Exit:  0 checks passed on a clean tree (integrable)
+#        1 at least one check failed
+#        2 config/usage error
+#        3 checks passed but the tree was dirty (NOT integrable)
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 need jq
 
@@ -18,6 +21,9 @@ done
 
 SHA="$(head_sha)"
 BRANCH="$(current_branch)"
+TREE="$(git rev-parse 'HEAD^{tree}')"
+CONF_FILE="${DEVLOOP_CONF:-$ROOT/.devloop.conf}"
+CONF_HASH="$(blob_hash "$CONF_FILE")"
 DIRTY=false
 if is_dirty; then DIRTY=true; fi
 
@@ -38,7 +44,11 @@ for var in $(compgen -A variable | grep '^CHECK_' | sort || true); do
   COUNT=$((COUNT + 1))
   log="$OUT/$name.log"
   start=$SECONDS
-  if ( eval "$cmd" ) >"$log" 2>&1; then code=0; else code=$?; fi
+  if command -v timeout >/dev/null 2>&1; then
+    if timeout "$GATE_TIMEOUT" bash -c "$cmd" >"$log" 2>&1; then code=0; else code=$?; fi
+  else
+    if bash -c "$cmd" >"$log" 2>&1; then code=0; else code=$?; fi
+  fi
   dur=$((SECONDS - start))
   [ "$code" -eq 0 ] || FAIL=1
   jq -nc --arg name "$name" --arg cmd "$cmd" --argjson exit "$code" --argjson s "$dur" \
@@ -59,14 +69,25 @@ OK=false
 
 jq -n \
   --arg sha "$SHA" --arg branch "$BRANCH" --arg task "$TASK" \
+  --arg tree "$TREE" --arg conf "$CONF_HASH" --argjson timeout "$GATE_TIMEOUT" \
   --argjson dirty "$DIRTY" --argjson ok "$OK" --argjson checks "$CHECKS_JSON" \
   --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{sha:$sha,branch:$branch,task:$task,dirty:$dirty,ok:$ok,checks:$checks,generated_at:$ts}' \
+  '{sha:$sha,branch:$branch,task:$task,tree:$tree,conf_sha256:$conf,timeout_seconds:$timeout,
+    dirty:$dirty,ok:$ok,checks:$checks,generated_at:$ts}' \
   > "$OUT/result.json"
 
 if [ "$DIRTY" = true ]; then
-  echo "devloop: working tree is DIRTY; this result cannot be integrated until you commit and re-run."
+  if [ "$QUIET" -eq 0 ]; then
+    echo "devloop: gate UNVERIFIED (dirty working tree); this result cannot be integrated."
+    if [ "$OK" = true ]; then
+      echo "devloop: the checks passed, but uncommitted work was present -> ${OUT#"$ROOT"/}/result.json"
+    else
+      echo "devloop: one or more checks also failed -> ${OUT#"$ROOT"/}/result.json"
+    fi
+  fi
+  exit 3
 fi
+
 if [ "$OK" = true ]; then
   [ "$QUIET" -eq 0 ] && echo "devloop: gate PASSED -> ${OUT#"$ROOT"/}/result.json"
   exit 0

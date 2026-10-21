@@ -11,11 +11,34 @@ MAIN_BRANCH="main"
 MAX_DIFF_LINES="400"
 REQUIRE_CI="false"
 PROTECTED_BRANCHES="main master"
+GATE_TIMEOUT="${GATE_TIMEOUT:-900}"
+CONTRACT_PATHS="${CONTRACT_PATHS:-.devloop.conf scripts/devloop .githooks .github/workflows AGENTS.md}"
 
 # shellcheck disable=SC1090
 [ -f "${DEVLOOP_CONF:-$ROOT/.devloop.conf}" ] && . "${DEVLOOP_CONF:-$ROOT/.devloop.conf}"
 
-ART="$ROOT/.devloop/artifacts"
+# --- evidence store ---------------------------------------------------------
+# Artifacts live in the git common directory, not in the worktree. Two
+# consequences: every worktree of this repository shares one evidence store,
+# and running the gate never creates an untracked file, so a fresh clone cannot
+# turn the next run dirty. CI may relocate the store with DEVLOOP_ARTIFACTS to
+# avoid writing inside .git.
+git_common_dir() {
+  local d
+  d="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  if [ -z "$d" ]; then
+    d="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+    [ -n "$d" ] || d=".git"
+    case "$d" in
+      /*) ;;
+      *) d="$ROOT/$d" ;;
+    esac
+    d="$(cd "$d" 2>/dev/null && pwd -P || printf '%s' "$d")"
+  fi
+  printf '%s' "$d"
+}
+GIT_COMMON_DIR="$(git_common_dir)"
+ART="${DEVLOOP_ARTIFACTS:-$GIT_COMMON_DIR/devloop}"
 
 die() { echo "devloop: $*" >&2; exit 2; }
 
@@ -33,16 +56,23 @@ is_dirty() {
     || [ -n "$(git ls-files --others --exclude-standard)" ]
 }
 
-# Merge base against the main branch, with fallbacks for local-only repos.
+# Closest merge base among the local main branch and its origin tracking ref.
+# Preferring the closer one keeps a local-only integration from inflating every
+# later diff when origin/main has not been pushed yet.
 merge_base() {
-  local ref=""
-  if git rev-parse --verify --quiet "origin/${MAIN_BRANCH}" >/dev/null; then
-    ref="origin/${MAIN_BRANCH}"
-  elif git rev-parse --verify --quiet "${MAIN_BRANCH}" >/dev/null; then
-    ref="${MAIN_BRANCH}"
-  fi
-  if [ -n "$ref" ]; then
-    git merge-base HEAD "$ref"
+  local ref mb n best="" best_n=""
+  for ref in "$MAIN_BRANCH" "origin/$MAIN_BRANCH"; do
+    git rev-parse --verify --quiet "$ref" >/dev/null || continue
+    mb="$(git merge-base HEAD "$ref" 2>/dev/null || true)"
+    [ -n "$mb" ] || continue
+    n="$(git rev-list --count "$mb..HEAD")"
+    if [ -z "$best_n" ] || [ "$n" -lt "$best_n" ]; then
+      best="$mb"
+      best_n="$n"
+    fi
+  done
+  if [ -n "$best" ]; then
+    printf '%s' "$best"
   else
     git rev-list --max-parents=0 HEAD | tail -1
   fi
@@ -56,8 +86,14 @@ fm() {
     | sed -E "s/^$2:[[:space:]]*//; s/[[:space:]]*$//; s/^[\"']//; s/[\"']$//"
 }
 
-diff_lines() { # <base> -> added + removed lines
-  git diff --numstat "$1..HEAD" | awk '{ a += $1; d += $2 } END { print a + d + 0 }'
+# Added + removed lines outside review documents. The size limit exists to keep
+# the code reviewable; review files are a direct consequence of the loop.
+diff_lines() {
+  git diff --numstat "$1..HEAD" \
+    | awk '$3 !~ /^docs\/reviews\// { a += $1; d += $2 } END { print a + d + 0 }'
 }
 
 changed_files() { git diff --name-only "$1..HEAD"; }
+
+# Stable fingerprint of a file without depending on sha256sum/shasum.
+blob_hash() { [ -f "$1" ] && git hash-object -- "$1" || true; }

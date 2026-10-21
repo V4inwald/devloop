@@ -60,6 +60,7 @@ EOF
   bash scripts/devloop/install-hooks.sh >/dev/null
   git add -A
   git commit -q -m "chore: bootstrap fixture"
+  ART_DIR="$(git rev-parse --path-format=absolute --git-common-dir)/devloop"
 }
 
 new_branch() { git switch -q -c "$1" main; }
@@ -88,6 +89,26 @@ EOF
 }
 
 setup
+say "artifact store"
+
+expect_ok "first gate run" bash scripts/devloop/gate.sh --quiet
+expect_ok "second gate run" bash scripts/devloop/gate.sh --quiet
+ART_SHA="$(git rev-parse HEAD)"
+[ -f "$ART_DIR/gate/$ART_SHA/result.json" ] \
+  && ok "artifacts live in the git common dir" || ko "artifacts live in the git common dir"
+[ ! -e .devloop ] \
+  && ok "no artifact directory inside the worktree" || ko "no artifact directory inside the worktree"
+[ -z "$(git status --porcelain)" ] \
+  && ok "gate output does not dirty the tree" || ko "gate output does not dirty the tree"
+[ "$(jq -r .dirty "$ART_DIR/gate/$ART_SHA/result.json")" = "false" ] \
+  && ok "second run records dirty=false" || ko "second run records dirty=false"
+WT_ART="$TMP/wt-artifacts"
+git worktree add -q --detach "$WT_ART" main
+( cd "$WT_ART" \
+  && [ -f "$(git rev-parse --path-format=absolute --git-common-dir)/devloop/gate/$ART_SHA/result.json" ] ) \
+  && ok "linked worktree sees the same artifacts" || ko "linked worktree sees the same artifacts"
+git worktree remove --force "$WT_ART" >/dev/null 2>&1
+
 say "hooks and commit policy"
 
 printf '// touch\n' >> src/math.js
@@ -118,12 +139,23 @@ expect_ok "commit-msg accepts a conventional subject" git commit -q -m "feat(mat
 say "gate"
 expect_ok "gate passes on green code" bash scripts/devloop/gate.sh --quiet
 SHA1="$(git rev-parse HEAD)"
-[ "$(jq -r .ok ".devloop/artifacts/gate/$SHA1/result.json")" = "true" ] \
+[ "$(jq -r .ok "$ART_DIR/gate/$SHA1/result.json")" = "true" ] \
   && ok "gate result records ok=true" || ko "gate result records ok=true"
-[ "$(jq -r .sha ".devloop/artifacts/gate/$SHA1/result.json")" = "$SHA1" ] \
+[ "$(jq -r .sha "$ART_DIR/gate/$SHA1/result.json")" = "$SHA1" ] \
   && ok "gate result is bound to HEAD" || ko "gate result is bound to HEAD"
-[ "$(jq -r .dirty ".devloop/artifacts/gate/$SHA1/result.json")" = "false" ] \
+[ "$(jq -r .dirty "$ART_DIR/gate/$SHA1/result.json")" = "false" ] \
   && ok "clean tree recorded as dirty=false" || ko "clean tree recorded as dirty=false"
+
+say "dirty gate"
+printf '// dirty\n' >> src/math.js
+D_OUT="$(bash scripts/devloop/gate.sh 2>&1)"; D_CODE=$?
+[ "$D_CODE" -eq 3 ] && ok "dirty gate exits 3" || ko "dirty gate exits 3 (got $D_CODE)"
+case "$D_OUT" in
+  *PASSED*) ko "dirty gate never prints PASSED" ;;
+  *) ok "dirty gate never prints PASSED" ;;
+esac
+git checkout -q -- src/math.js
+bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
 
 say "review packet"
 PACKET="$(bash scripts/devloop/packet.sh)"
@@ -157,7 +189,7 @@ case "$LOG" in
   *"chore(merge)"*) ok "merge commit uses the conventional subject" ;;
   *) ko "merge commit uses the conventional subject" ;;
 esac
-[ -f ".devloop/artifacts/integrations/$MERGED_SHA.json" ] \
+[ -f "$ART_DIR/integrations/$MERGED_SHA.json" ] \
   && ok "integration audit record created" || ko "integration audit record created"
 
 say "doctor"
@@ -169,7 +201,7 @@ new_branch task/002-break
 sed -i 's/return a + b;/return a - b;/' src/math.js
 git commit -qam "fix(math): change add semantics"
 expect_fail "gate fails when a check fails" bash scripts/devloop/gate.sh --quiet
-[ "$(jq -r .ok ".devloop/artifacts/gate/$(git rev-parse HEAD)/result.json")" = "false" ] \
+[ "$(jq -r .ok "$ART_DIR/gate/$(git rev-parse HEAD)/result.json")" = "false" ] \
   && ok "failed gate records ok=false" || ko "failed gate records ok=false"
 git switch -q main
 
@@ -178,7 +210,7 @@ new_branch task/003-dirty
 printf '// uncommitted\n' >> src/math.js
 bash scripts/devloop/gate.sh --quiet >/dev/null 2>&1
 DSHA="$(git rev-parse HEAD)"
-[ "$(jq -r .dirty ".devloop/artifacts/gate/$DSHA/result.json")" = "true" ] \
+[ "$(jq -r .dirty "$ART_DIR/gate/$DSHA/result.json")" = "true" ] \
   && ok "gate records dirty=true for uncommitted work" || ko "gate records dirty=true for uncommitted work"
 expect_fail "integrate refuses a dirty-tree gate" bash scripts/devloop/integrate.sh --task task-003
 git restore .
