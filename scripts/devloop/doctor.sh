@@ -41,6 +41,21 @@ gate_state() {
   esac
 }
 
+# Print "<record>\t<source>" for the integration merge <sha>, or nothing.
+find_integration() {
+  local sha="$1" dir f
+  for dir in "$ART" "$LEGACY_ART"; do
+    for f in "$dir"/integrations/*.json; do
+      [ -f "$f" ] || continue
+      if [ "$(jq -r '.merge_sha // empty' "$f" 2>/dev/null || true)" = "$sha" ]; then
+        printf '%s\t%s\n' "$f" "$dir"
+        return 0
+      fi
+    done
+  done
+  return 0
+}
+
 # Print the review file that approves this exact SHA, or nothing.
 review_covers() {
   local sha="$1" f s post offenders
@@ -82,18 +97,29 @@ case "$ART" in
 esac
 
 SHA="$(head_sha)"
+EVIDENCE_SHA="$SHA"
+BOOKKEEPING=0
+FOUND="$(find_integration "$SHA")"
+if [ -z "$FOUND" ] && git rev-parse --verify --quiet HEAD^ >/dev/null 2>&1; then
+  PARENT="$(git rev-parse HEAD^)"
+  BOOK_DIFF="$(git diff --name-only "$PARENT..$SHA" || true)"
+  if [ -n "$BOOK_DIFF" ] \
+     && [ -z "$(printf '%s\n' "$BOOK_DIFF" | grep -vE '^docs/(STATE|LESSONS)\.md$' || true)" ]; then
+    EVIDENCE_SHA="$PARENT"
+    BOOKKEEPING=1
+    FOUND="$(find_integration "$EVIDENCE_SHA")"
+  fi
+fi
+
 INTEGRATION=""
 INTEGRATION_SOURCE=""
-for dir in "$ART" "$LEGACY_ART"; do
-  for f in "$dir"/integrations/*.json; do
-    [ -f "$f" ] || continue
-    if [ "$(jq -r '.merge_sha // empty' "$f" 2>/dev/null || true)" = "$SHA" ]; then
-      INTEGRATION="$f"
-      INTEGRATION_SOURCE="$dir"
-      break 2
-    fi
-  done
-done
+if [ -n "$FOUND" ]; then
+  INTEGRATION="${FOUND%%$'\t'*}"
+  INTEGRATION_SOURCE="${FOUND#*$'\t'}"
+fi
+if [ "$BOOKKEEPING" -eq 1 ]; then
+  ok "HEAD is a bookkeeping commit; evidence is verified at $EVIDENCE_SHA"
+fi
 
 if [ -n "$INTEGRATION" ]; then
   INTEGRATED_HEAD="$(jq -r '.head_sha // empty' "$INTEGRATION")"
@@ -105,14 +131,14 @@ if [ -n "$INTEGRATION" ]; then
   fi
 
   if [ -n "$MERGE_GATE" ]; then
-    SRC="$(gate_source "$SHA")"
+    SRC="$(gate_source "$EVIDENCE_SHA")"
     [ "$SRC" = "legacy" ] && warn "merge gate evidence comes from the legacy store"
-    case "$(gate_state "$SHA")" in
+    case "$(gate_state "$EVIDENCE_SHA")" in
       ok)     ok "merge commit has a passing clean gate result" ;;
-      dirty)  err "merge gate was produced on a dirty tree ($SHA)" ;;
-      failed) err "merge gate failed ($SHA)" ;;
-      stale)  err "merge gate result names another SHA ($SHA)" ;;
-      *)      err "merge gate is missing for $SHA; re-run integrate.sh" ;;
+      dirty)  err "merge gate was produced on a dirty tree ($EVIDENCE_SHA)" ;;
+      failed) err "merge gate failed ($EVIDENCE_SHA)" ;;
+      stale)  err "merge gate result names another SHA ($EVIDENCE_SHA)" ;;
+      *)      err "merge gate is missing for $EVIDENCE_SHA; re-run integrate.sh" ;;
     esac
   else
     SRC="$(gate_source "$INTEGRATED_HEAD")"
@@ -131,17 +157,17 @@ if [ -n "$INTEGRATION" ]; then
   if [ -n "$FILE_FOUND" ]; then ok "review file $FILE_FOUND covers the reviewed SHA"
   else err "no approving review file covers $REVIEWED"; fi
 else
-  SRC="$(gate_source "$SHA")"
+  SRC="$(gate_source "$EVIDENCE_SHA")"
   [ "$SRC" = "legacy" ] && warn "gate evidence comes from the legacy store ($LEGACY_ART)"
-  case "$(gate_state "$SHA")" in
+  case "$(gate_state "$EVIDENCE_SHA")" in
     ok)     ok "passing clean gate result for HEAD" ;;
     dirty)  err "gate result for HEAD was produced on a dirty tree; commit and re-run gate.sh" ;;
-    failed) err "gate result for HEAD is failing; see $(gate_json "$SHA")" ;;
+    failed) err "gate result for HEAD is failing; see $(gate_json "$EVIDENCE_SHA")" ;;
     stale)  err "gate result names another SHA; re-run gate.sh" ;;
     *)      err "no gate result for HEAD; run scripts/devloop/gate.sh" ;;
   esac
 
-  FILE_FOUND="$(review_covers "$SHA")"
+  FILE_FOUND="$(review_covers "$EVIDENCE_SHA")"
   if [ -n "$FILE_FOUND" ]; then ok "review file $FILE_FOUND covers HEAD"
   else err "no approving review file covers HEAD"; fi
 fi
