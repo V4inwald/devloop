@@ -44,27 +44,13 @@ Out of scope: `integrate.sh` (task-002), install, documentation.
 
 ## Notes / decisions
 
-- 2026-10-21 (round 1 review): four blockers found and fixed.
-  1. doctor misreported `$ROOT/.git/devloop` as "inside the worktree"; the
-     shared-store arm now checks `$GIT_COMMON_DIR/*` first.
-  2. doctor ignored legacy evidence; it now falls back read-only to
-     `$ROOT/.devloop/artifacts` and warns when it does.
-  3. the gate ran `CHECK_*` through `bash -c`, breaking the documented `eval`
-     contract (shell functions in `.devloop.conf` stopped working); restored
-     `( eval "$cmd" )`.
-  4. the CI upload still pointed at `.devloop/artifacts`; the workflow now sets
-     `DEVLOOP_ARTIFACTS` to `${{ runner.temp }}/devloop` and uploads that path.
-- Scope kept to the task: the `merge_base`/`diff_lines` helpers, provenance
-  metadata and the contract-drift warning were removed from this change and
-  belong to task-002 (integration) and task-004 (docs).
-- Deferred deliberately: `integrate.sh` starts writing `merge_gate` in
-  task-002; doctor already consumes it.
-- 2026-10-21 (round 2): two independent verdicts on the same SHA.
-  `task-001-r2.md` = revise, `task-001-r3.md` = approve. The stricter finding
-  wins: `runner.temp` is not available in `jobs.<job_id>.env`, so
-  `DEVLOOP_ARTIFACTS` moved to the gate step. r3 did not catch that context
-  bug, which is why the CI fix is taken anyway.
-- 2026-10-21 (size accounting): review verdicts are the output of the review,
-  not part of the change. `diff_lines` now excludes `docs/reviews/`; the
-  substantive diff is 319 lines, under `MAX_DIFF_LINES=400`, and a test pins
-  the exclusion.
+- Round 1 (revise): four blockers — doctor's store arm, the legacy fallback,
+  the `bash -c` regression against the documented `eval`, and the CI upload
+  path. All are fixed and pinned by tests. Round 2 split (r2 revise / r3
+  approve) confirmed that the `runner` context is step-scoped; the env moved
+  to the gate step.
+- Scope kept to the task; the merge_base/diff_lines provenance and the
+  contract warning belong to task-002/task-004. `merge_gate` is consumed by
+  doctor and produced by task-002.
+- Size: `diff_lines` excludes `docs/reviews/` because verdicts are review
+  output, not the change; a test pins it.
