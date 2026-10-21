@@ -49,3 +49,13 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
 - 2026-10-21 (task-005): in team mode the review file is the handoff artefact (`task:`, `sha:`,
   blob), never a chat message or a shared draft → one writer per worktree, one integrator at a
   time, one review per task.
+- 2026-10-21 (task-006): a server-side control is only as real as the plan →
+  GitHub branch protection and rulesets are unavailable on private repositories
+  on Free; verify the plan before designing on it, and state the residual risk
+  instead of claiming enforcement.
+- 2026-10-21 (task-006): dogfooding an integration path is not proof of the
+  protection it is supposed to run under → test the actual rejection separately;
+  the PR flow can be green while direct pushes remain possible.
+- 2026-10-21 (task-006): when `main` cannot be pushed directly, bookkeeping
+  (`STATE.md`/`LESSONS.md`) travels through a short `state/<sha>` PR; the
+  substance of the exception is unchanged, only its transport.
