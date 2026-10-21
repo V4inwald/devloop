@@ -61,7 +61,7 @@ Détail et règles d'écriture : `design/03-memory.md`.
 
 ## Ce qui est vérifié dans ce dépôt
 
-- `bash tests/run.sh` : **110 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
+- `bash tests/run.sh` : **114 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
   kit, et vérifie les refus réels : commit hors convention, absence de revue, revue pour un SHA
   inconnu, revue invalidée par un commit de code, arbre sale, diff trop gros, gate rouge, push
   direct sur `main`, push non fast-forward, `--no-verify` rattrapé par `policy.sh`.
@@ -94,9 +94,12 @@ en public, `protect.sh` devient la barrière et `main-guard` reste une ceinture 
 
 ## Publication
 
-Le kit est publié **privé par défaut** : `gh repo create --private`. Ne le passer en public que
-sur demande explicite. L'authentification de ce workspace est dans `/workspace/.github-env`
-(compte `V4inwald`) ; ne jamais commiter `.gh` ni `.github-env`.
+Ce dépôt est un **outil** : il est destiné à être public (licence MIT, politique de sécurité
+dans `SECURITY.md`), tandis que les projets qui l'utilisent restent privés. Le dépôt a été
+audité avant publication (`docs/security/pre-public-audit.md`) : aucun secret dans l'historique.
+Après le passage en public, `protect.sh` applique la protection de `main` et GitHub active le
+secret scanning + push protection. L'authentification du workspace reste **hors du dépôt** ;
+ne jamais commiter `.gh`, `.github-env`, `.env` ou une clé.
 
 ## Limites assumées
 

@@ -717,6 +717,17 @@ OUT="$(env DEVLOOP_CONF="$TMP/require-pr.conf" bash scripts/devloop/integrate.sh
 printf '%s' "$OUT" | grep -q "REQUIRE_PR=true" \
   && ok "REQUIRE_PR refuses a local integration" || ko "REQUIRE_PR refuses a local integration"
 
+say "public readiness"
+[ -f "$SRC/LICENSE" ] && grep -q "MIT License" "$SRC/LICENSE" \
+  && ok "public readiness: MIT license present" || ko "public readiness: MIT license present"
+[ -f "$SRC/SECURITY.md" ] && grep -qi "vulnerability" "$SRC/SECURITY.md" \
+  && ok "public readiness: security policy present" || ko "public readiness: security policy present"
+grep -qx ".plugin-work/" "$SRC/.gitignore" && grep -qx ".devloop/" "$SRC/.gitignore" \
+  && ok "public readiness: scratch and legacy artifacts ignored" \
+  || ko "public readiness: scratch and legacy artifacts ignored"
+[ -f "$SRC/docs/security/pre-public-audit.md" ] \
+  && ok "public readiness: audit report present" || ko "public readiness: audit report present"
+
 say "doctor without evidence"
 new_branch task/008-nogate
 printf '\nexport const n = 0;\n' >> src/math.js

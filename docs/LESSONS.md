@@ -31,7 +31,7 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
 - 2026-10-21 (task-003): local green is not CI green → test fixtures must unset the caller's
   `DEVLOOP_ARTIFACTS`/`DEVLOOP_CONF`, and the first GitHub Actions run is the only proof the
   workflow actually works; run it before claiming CI evidence.
-- 2026-10-21 (GitHub): authentication lives in `/workspace/.github-env` (account `V4inwald`),
+- 2026-10-21 (GitHub): authentication lives outside the repository (public account `V4inwald`),
   and a new repository is **private by default**; the initial push to `main` needs the explicit
   `ALLOW_MAIN_PUSH=1` release override, which is the hook working as designed.
 - 2026-10-21 (task-004): the installable bundle was excluded from git by a local
