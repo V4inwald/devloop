@@ -1,30 +1,35 @@
 # STATE — current truth
 
-<!--
-Keep this file short and current. It is read at the start of every session.
-`last_verified_sha` must be a commit that exists; doctor.sh compares it with HEAD.
-Never write aspirational claims here: only what the artifacts prove.
--->
-
 ```yaml
-last_verified_sha: <sha>
-last_verified_at: YYYY-MM-DD
-current_focus: <task id / one line>
+last_verified_sha: ed30cdb679ec778a83df90278c8a89fa401a2533
+last_verified_at: 2026-10-21
+current_focus: adoption on a first real repository
 ```
 
 ## Working now
 
-- <task-NNN>: <one line>. Status: <ready|in_progress|review>.
+- No active task. The kit is bootstrapped on `main` at `ed30cdb`, gated (LINT + TEST pass),
+  merged from `task/000-bootstrap`.
 
 ## Next actions
 
-1. <concrete next step>
-2. <concrete next step>
+1. Copy the kit into a real repository, adapt `.devloop.conf`, run `install-hooks.sh`.
+2. Run one short real task with a subagent reviewer, and keep the first verdict file.
+3. Turn on branch protection and required checks; authenticate `gh`; set `REQUIRE_CI=true`.
+4. Record the baseline metrics: gate first-pass rate, review blocker rate, time per task.
 
 ## Known issues
 
-- <issue> — evidence: <path or command> — impact: <...>
+- The bootstrap merge is unreviewed by design (pre-adoption). `doctor.sh` reports it as an error;
+  this is expected until the first task is integrated through `integrate.sh`.
+- `doctor.sh` warns when `STATE.md` is updated by a `chore(state):` commit, because it compares
+  the recorded SHA with HEAD. Anchoring evidence past bookkeeping commits is a planned fix.
+- The GitHub Actions workflow has never been executed: no remote, `gh` is not authenticated.
+- `policy.sh` secret detection is a regex heuristic, not a dedicated scanner.
+- The review path is exercised by the test harness, not by an independent LLM review of this
+  bootstrap.
 
 ## Environment notes
 
-- <runtime versions, services required, credentials needed>
+- git 2.47.3, node v24.22.0, jq present, bash 5.
+- Full check: `bash scripts/devloop/gate.sh` (runs `tests/run.sh`, 29 assertions).
