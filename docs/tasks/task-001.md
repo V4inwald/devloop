@@ -1,6 +1,6 @@
 ---
 id: task-001
-status: review
+status: done
 branch: task/001-artifacts
 created: 2026-10-21
 owner: lead

@@ -1,6 +1,6 @@
 ---
 id: task-003
-status: review
+status: done
 branch: task/003-ci-isolation
 created: 2026-10-21
 owner: lead

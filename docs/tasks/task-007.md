@@ -1,6 +1,6 @@
 ---
 id: task-007
-status: review
+status: done
 branch: task/007-main-guard
 created: 2026-10-21
 owner: lead

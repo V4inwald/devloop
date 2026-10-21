@@ -1,6 +1,6 @@
 ---
 id: task-004
-status: review
+status: done
 branch: task/004-hard-holes
 created: 2026-10-21
 owner: lead
