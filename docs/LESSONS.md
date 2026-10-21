@@ -43,3 +43,9 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
 - 2026-10-21 (task-004): an installer must preflight every conflict, back up on `--force`, and
   never `rm -rf` a directory it did not create → the first install into an existing repo must
   preserve unknown hooks, workflows and lessons.
+- 2026-10-21 (task-005): a skill that names the old store or the old commands is worse than no
+  skill → every engine change must update the entry skill and the three procedures, and a drift
+  test must pin the bundle mirror to the source.
+- 2026-10-21 (task-005): in team mode the review file is the handoff artefact (`task:`, `sha:`,
+  blob), never a chat message or a shared draft → one writer per worktree, one integrator at a
+  time, one review per task.
