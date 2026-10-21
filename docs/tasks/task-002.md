@@ -58,3 +58,11 @@ Out of scope: install, CI workflow, `policy.sh`, pre-push, documentation
 - Review files are pinned by `Reviewed-by:` + `Reviewed-blob:` trailers and by
   `review_blob` in the integration record; only `A` additions under
   `docs/reviews/` are tolerated after the reviewed SHA.
+- 2026-10-21 (round 2): doctor now fails closed for a bookkeeping commit whose
+  parent is not an integration merge. The contract floor is a literal union in
+  `common.sh`, not a sourced variable, so a branch cannot empty it with
+  `CONTRACT_PATHS_DEFAULT=""`; `integrate.sh` also dies if the resolved list is
+  empty. The task-016 fixture sets both knobs to empty to pin the attack.
+- Note on AC6: the suite grew during the round-2 fixes and now reports 68
+  assertions; the criterion's substance (the suite passes) is unchanged, and
+  the count is not rewritten in the criterion above.

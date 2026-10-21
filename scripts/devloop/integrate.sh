@@ -139,11 +139,10 @@ fi
 # --- contract paths --------------------------------------------------------
 CHANGED="$(git diff --name-only "$BASE..$SHA")"
 TOUCHED=""
-if [ -n "$CONTRACT_PATHS" ]; then
-  for p in $CONTRACT_PATHS; do
-    if printf '%s\n' "$CHANGED" | grep -qE "^${p}(/|$)"; then TOUCHED="${TOUCHED:+$TOUCHED }$p"; fi
-  done
-fi
+[ -n "$CONTRACT_PATHS" ] || die "CONTRACT_PATHS resolved empty; refusing to skip the contract check"
+for p in $CONTRACT_PATHS; do
+  if printf '%s\n' "$CHANGED" | grep -qE "^${p}(/|$)"; then TOUCHED="${TOUCHED:+$TOUCHED }$p"; fi
+done
 if [ -n "$TOUCHED" ] && [ "$REVIEW_CONTRACT" != "approved" ]; then
   die "this change touches contract paths: $TOUCHED; the review must declare 'contract: approved'"
 fi

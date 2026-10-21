@@ -434,7 +434,7 @@ expect_ok "integrate tolerates a review without a contract field" bash scripts/d
 git switch -q main
 
 start_task task-016 016-contract-empty
-printf '\nCONTRACT_PATHS=""\n' >> .devloop.conf
+printf '\nCONTRACT_PATHS_DEFAULT=""\nCONTRACT_PATHS=""\n' >> .devloop.conf
 printf '\n# contract probe 2\n' >> scripts/devloop/common.sh
 printf 'export const sixteen = 16;\n' > src/sixteen.js
 git add -A
