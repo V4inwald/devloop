@@ -672,15 +672,16 @@ grep -q "Append only" "$FRESH/docs/LESSONS.md" \
 
 say "main guard"
 GUARD="$SRC/.github/workflows/main-guard.yml"
-grep -q 'Merge pull request #' "$GUARD" \
+GUARD_LOGIC="$SRC/scripts/devloop/main-guard.sh"
+grep -q 'Merge pull request #' "$GUARD_LOGIC" \
   && ok "guard verifies the pull-request merge subject" || ko "guard verifies the pull-request merge subject"
-grep -q 'gh issue create' "$GUARD" \
+grep -q 'gh issue create' "$GUARD_LOGIC" \
   && ok "guard reports a direct push in an issue" || ko "guard reports a direct push in an issue"
-grep -q 'mergeCommit.oid' "$GUARD" \
+grep -q 'mergeCommit.oid' "$GUARD_LOGIC" \
   && ok "guard checks the PR merge commit SHA" || ko "guard checks the PR merge commit SHA"
 grep -q 'REQUIRE_PR' "$GUARD" \
   && ok "guard skips repositories not in PR mode" || ko "guard skips repositories not in PR mode"
-grep -q 'baseRefName' "$GUARD" && grep -q 'BASE_BRANCH' "$GUARD" \
+grep -q 'baseRefName' "$GUARD_LOGIC" && grep -q 'BASE_BRANCH' "$GUARD" \
   && ok "guard checks the PR base branch" || ko "guard checks the PR base branch"
 diff -r "$SRC/.github/workflows" "$SRC/dist/devloop-skill/assets/.github/workflows" >/dev/null 2>&1 \
   && ok "bundle workflows mirror the source" || ko "bundle workflows mirror the source"
@@ -693,6 +694,54 @@ for f in docs/tasks/TEMPLATE.md docs/reviews/TEMPLATE.md docs/adr/0000-template.
   diff -q "$SRC/$f" "$SRC/dist/devloop-skill/assets/$f" >/dev/null 2>&1 || MIRROR_OK=0
 done
 [ "$MIRROR_OK" -eq 1 ] && ok "bundle docs templates mirror the source" || ko "bundle docs templates mirror the source"
+
+mkdir -p "$TMP/fakebin"
+cat > "$TMP/fakebin/gh" <<'FAKE'
+#!/usr/bin/env bash
+set -u
+case "${1:-} ${2:-}" in
+  "api repos/o/r/commits/"*)
+    [ "${FAKE_API_FAIL:-0}" -eq 1 ] && exit 1
+    printf '%s\n' "${FAKE_SUBJECT:-}"; exit 0 ;;
+  "pr view")
+    printf '%s\n' "${FAKE_PR_VIEW:-}"; exit 0 ;;
+  "issue create")
+    printf '%s\n' "$*" >> "${FAKE_ISSUE_LOG:?}"; exit 0 ;;
+  *) exit 1 ;;
+esac
+FAKE
+chmod +x "$TMP/fakebin/gh"
+G_SHA="$(printf 'a%.0s' {1..40})"
+G_LOG="$TMP/guard-issues.log"
+guard_run() {
+  : > "$G_LOG"
+  local rc=0
+  env PATH="$TMP/fakebin:$PATH" REPO=o/r SHA="${G_SHA:-}" ACTOR=alice BEFORE=bbb \
+    BASE_BRANCH=main FAKE_SUBJECT="${1:-}" FAKE_PR_VIEW="${2:-}" \
+    FAKE_API_FAIL="${3:-0}" FAKE_ISSUE_LOG="$G_LOG" \
+    bash "$GUARD_LOGIC" >/dev/null 2>&1 || rc=$?
+  echo "$rc"
+}
+CODE="$(guard_run 'Merge pull request #42 from x' "$(printf 'MERGED\t%s\tmain' "$G_SHA")")"
+[ "$CODE" -eq 0 ] && [ ! -s "$G_LOG" ] \
+  && ok "guard accepts a verified PR merge" || ko "guard accepts a verified PR merge"
+CODE="$(guard_run 'Merge pull request #42 from x' "$(printf 'MERGED\t%s\tmain' "$(printf 'b%.0s' {1..40})")")"
+[ "$CODE" -eq 1 ] && [ -s "$G_LOG" ] \
+  && ok "guard rejects a mismatched merge commit" || ko "guard rejects a mismatched merge commit"
+CODE="$(guard_run 'Merge pull request #42 from x' "$(printf 'MERGED\t%s\trelease' "$G_SHA")")"
+[ "$CODE" -eq 1 ] && [ -s "$G_LOG" ] \
+  && ok "guard rejects a non-default base branch" || ko "guard rejects a non-default base branch"
+CODE="$(guard_run 'feat: direct push' '')"
+[ "$CODE" -eq 1 ] && [ -s "$G_LOG" ] \
+  && ok "guard rejects a non-PR subject" || ko "guard rejects a non-PR subject"
+CODE="$(guard_run '' '' 1)"
+[ "$CODE" -eq 1 ] && [ -s "$G_LOG" ] \
+  && ok "guard reports an API failure instead of aborting" || ko "guard reports an API failure instead of aborting"
+G_SHA="$(printf '0%.0s' {1..40})"
+CODE="$(guard_run '' '')"
+[ "$CODE" -eq 0 ] && [ ! -s "$G_LOG" ] \
+  && ok "guard ignores a branch deletion" || ko "guard ignores a branch deletion"
+G_SHA="$(printf 'a%.0s' {1..40})"
 
 say "docs drift"
 if grep -rq '\.devloop/artifacts' "$SRC/AGENTS.md" "$SRC/README.md" "$SRC/scripts/devloop/packet.sh" "$SRC/.agents/skills" "$SRC/dist/devloop-skill/SKILL.md" 2>/dev/null; then

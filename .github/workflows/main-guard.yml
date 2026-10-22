@@ -1,10 +1,11 @@
 name: main-guard
 
-# Detection control, not prevention: on this plan branch protection is the
-# barrier (public repo or Pro). This workflow flags a push to main that is not
-# a verified pull-request merge. It only runs when the repository uses PR mode
+# Detection control, not prevention: branch protection is the barrier (public
+# repo or Pro). This workflow flags a push to main that is not a verified
+# pull-request merge. It only runs when the repository uses PR mode
 # (REQUIRE_PR=true); a local-mode project would otherwise flag its own
-# chore(merge) commits.
+# chore(merge) commits. The logic lives in scripts/devloop/main-guard.sh so the
+# failure paths are testable.
 
 on:
   push:
@@ -26,7 +27,7 @@ jobs:
       - name: Is this repository in PR mode?
         id: mode
         run: |
-          if grep -qE '^REQUIRE_PR="?true"?' .devloop.conf 2>/dev/null; then
+          if grep -qE "^REQUIRE_PR=(\"true\"|'true'|true)[[:space:]]*$" .devloop.conf 2>/dev/null; then
             echo enabled=true >> "$GITHUB_OUTPUT"
           else
             echo enabled=false >> "$GITHUB_OUTPUT"
@@ -40,42 +41,4 @@ jobs:
           ACTOR: ${{ github.actor }}
           BEFORE: ${{ github.event.before }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
-        run: |
-          set -euo pipefail
-          zero=0000000000000000000000000000000000000000
-          if [ "$SHA" = "$zero" ]; then
-            echo "branch deletion, nothing to check"
-            exit 0
-          fi
-          subject="$(gh api "repos/$REPO/commits/$SHA" --jq '.commit.message' | head -1)"
-          echo "head: $SHA"
-          echo "subject: $subject"
-          pr="$(printf '%s' "$subject" | sed -nE 's/^Merge pull request #([0-9]+) from .*/\1/p')"
-          reason=""
-          if [ -z "$pr" ]; then
-            reason="head is not a pull-request merge commit"
-          else
-            merged="$(gh pr view "$pr" --repo "$REPO" --json state,mergeCommit,baseRefName \
-              --jq '.state + "\t" + (.mergeCommit.oid // "") + "\t" + .baseRefName' 2>/dev/null || true)"
-            if [ -z "$merged" ]; then
-              reason="cannot read PR #$pr (unknown PR or API failure)"
-            else
-              state="$(printf '%s' "$merged" | cut -f1)"
-              oid="$(printf '%s' "$merged" | cut -f2)"
-              base="$(printf '%s' "$merged" | cut -f3)"
-              if [ "$state" != "MERGED" ]; then
-                reason="PR #$pr state is $state"
-              elif [ "$oid" != "$SHA" ]; then
-                reason="PR #$pr merge commit is $oid, not $SHA"
-              elif [ "$base" != "$BASE_BRANCH" ]; then
-                reason="PR #$pr was merged into $base, not $BASE_BRANCH"
-              else
-                echo "PR #$pr merged at $SHA into $BASE_BRANCH"
-                exit 0
-              fi
-            fi
-          fi
-          body="$(printf 'A push to `main` was not a verified pull-request merge.\n\n- head: `%s`\n- actor: `%s`\n- before: `%s`\n- reason: %s\n- commit: https://github.com/%s/commit/%s\n\nThis is a **detection** control; branch protection is the prevention. Inspect, revert if needed, and use `scripts/devloop/integrate.sh --pr`.\n' "$SHA" "$ACTOR" "$BEFORE" "$reason" "$REPO" "$SHA")"
-          gh issue create --repo "$REPO" --title "Direct push detected on main: ${SHA:0:12}" --body "$body" || true
-          echo "::error::direct push detected: $reason"
-          exit 1
+        run: bash scripts/devloop/main-guard.sh
