@@ -19,17 +19,18 @@ repository.
 ## Acceptance criteria
 
 - [x] AC1: the backup path includes the PID and a collision loop; a second forced install keeps a separate backup.
-- [x] AC2: the executable bit is applied only to the paths coming from the kit assets; a custom `.githooks/commit-msg` and `scripts/devloop/deploy.sh` keep mode 644.
+- [x] AC2: the executable bit is applied only to the paths coming from the kit assets; a custom `.githooks/pre-commit` and `scripts/devloop/deploy.sh` keep mode 644.
 - [x] AC3: a symlink in the destination path is detected in the preflight (targets and `AGENTS.devloop.md`), the installer exits 4, and nothing is written through it.
 - [x] AC4: tests cover the three cases; gate/doctor pass; the bundle is unchanged (the installer is the shipped artefact).
 
 ## Scope
 
-Touched: `dist/devloop-skill/install.sh`, `tests/run.sh`, `docs/tasks/task-012.md`.
+Touched: `dist/devloop-skill/install.sh`, `dist/devloop-skill/SKILL.md`, `tests/run.sh`,
+`README.md`, `docs/tasks/task-012.md`, refreshed bundle.
 
 ## Verification plan
 
-1. `bash tests/run.sh` (>= 130 assertions).
+1. `bash tests/run.sh` (>= 132 assertions).
 2. `bash scripts/devloop/gate.sh`.
 3. PR merge under protection.
 

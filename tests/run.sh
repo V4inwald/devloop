@@ -662,6 +662,9 @@ B_BEFORE="$(find "$COMMON/devloop" -maxdepth 1 -type d -name 'backup-*' 2>/dev/n
 B_AFTER="$(find "$COMMON/devloop" -maxdepth 1 -type d -name 'backup-*' 2>/dev/null | wc -l)"
 [ "$B_AFTER" -gt "$B_BEFORE" ] \
   && ok "a second forced install gets a fresh backup" || ko "a second forced install gets a fresh backup"
+B_NAME="$(find "$COMMON/devloop" -maxdepth 1 -type d -name 'backup-*' -printf '%f\n' 2>/dev/null | head -1)"
+printf '%s' "$B_NAME" | grep -qE '^backup-[0-9]{8}T[0-9]{6}Z-[0-9]+$' \
+  && ok "backup names carry the PID suffix" || ko "backup names carry the PID suffix"
 
 FRESH="$TMP/install-fresh"
 mkdir -p "$FRESH"

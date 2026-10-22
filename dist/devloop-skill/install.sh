@@ -3,7 +3,7 @@
 #
 # Usage: install.sh [--force] [--dry-run]
 #   --force     overwrite files that already exist (a timestamped backup is kept
-#               under <git-common-dir>/devloop/backup-<utc>)
+#               under <git-common-dir>/devloop/backup-<utc>-<pid>)
 #   --dry-run   print what would be installed or kept; write nothing
 #
 # Never overwrites: .devloop.conf, docs/STATE.md, docs/LESSONS.md, AGENTS.md.
