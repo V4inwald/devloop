@@ -3,7 +3,7 @@
 #
 # Usage: install.sh [--force] [--dry-run]
 #   --force     overwrite files that already exist (a timestamped backup is kept
-#               under <git-common-dir>/devloop/backup-<utc>)
+#               under <git-common-dir>/devloop/backup-<utc>-<pid>)
 #   --dry-run   print what would be installed or kept; write nothing
 #
 # Never overwrites: .devloop.conf, docs/STATE.md, docs/LESSONS.md, AGENTS.md.
@@ -42,7 +42,12 @@ if [ -z "$GIT_COMMON" ]; then
   case "$GIT_COMMON" in /*) ;; *) GIT_COMMON="$ROOT/$GIT_COMMON" ;; esac
 fi
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-BACKUP="$GIT_COMMON/devloop/backup-$STAMP"
+BACKUP="$GIT_COMMON/devloop/backup-$STAMP-$$"
+n=1
+while [ -e "$BACKUP" ]; do
+  BACKUP="$GIT_COMMON/devloop/backup-$STAMP-$$-$n"
+  n=$((n + 1))
+done
 
 if [ -f scripts/devloop/gate.sh ] && [ "$FORCE" -ne 1 ]; then
   echo "devloop is already installed in $ROOT"
@@ -69,6 +74,32 @@ targets() {
     printf '%s\t%s\n' "$rel" "$dst"
   done < <(cd "$ASSETS" && find . -type f -print | sed 's|^\./||' | sort)
 }
+
+# A destination reached through a symlink could be written outside the
+# repository; refuse it even with --force (the user removes it explicitly).
+unsafe_dest() { # <path>
+  local p="$1" d
+  [ -L "$p" ] && return 0
+  d="$(dirname "$p")"
+  while [ "$d" != "." ] && [ "$d" != "/" ]; do
+    [ -L "$d" ] && return 0
+    d="$(dirname "$d")"
+  done
+  return 1
+}
+
+UNSAFE=""
+while IFS=$'\t' read -r _ dst; do
+  [ -n "$dst" ] || continue
+  if unsafe_dest "$dst"; then UNSAFE="$UNSAFE $dst"; fi
+done < <(targets)
+if unsafe_dest AGENTS.devloop.md; then UNSAFE="$UNSAFE AGENTS.devloop.md"; fi
+if [ -n "$UNSAFE" ]; then
+  echo "devloop install: refusing symlinked destinations (they could write outside the repository):" >&2
+  for f in $UNSAFE; do echo "  $f" >&2; done
+  echo "remove the symlink(s) and re-run." >&2
+  exit 4
+fi
 
 # Paths that are never overwritten, even with --force.
 KEEP_IF_PRESENT=" docs/STATE.md docs/LESSONS.md .devloop.conf "
@@ -148,7 +179,12 @@ else
 fi
 
 if [ "$DRY" -eq 0 ]; then
-  chmod +x .githooks/* scripts/devloop/*.sh 2>/dev/null || true
+  while IFS=$'\t' read -r _ dst; do
+    case "$dst" in
+      .githooks/*|scripts/devloop/*)
+        if [ -f "$dst" ]; then chmod +x "$dst"; fi ;;
+    esac
+  done < <(targets)
 
   CURRENT_HOOKS_PATH="$(git config --get core.hooksPath || true)"
   if [ -z "$CURRENT_HOOKS_PATH" ] || [ "$CURRENT_HOOKS_PATH" = ".githooks" ]; then
