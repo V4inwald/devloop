@@ -77,6 +77,10 @@ bash scripts/devloop/gate.sh --task <id>
 
 Do not lower the bar: no skipped tests, no `|| true`, no loosened assertions.
 
+To prove a new test is red without the fix:
+`bash scripts/devloop/prove-red.sh <base-rev> -- <test command>`. It copies the changed test
+files into a worktree at the base commit and expects the command to fail there.
+
 ## Step 5 — review
 
 1. Build the packet: `bash scripts/devloop/packet.sh` → `.git/devloop/review/<sha>-packet.md`.
