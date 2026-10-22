@@ -653,6 +653,15 @@ BACKUPS="$(find "$COMMON/devloop" -maxdepth 1 -type d -name 'backup-*' 2>/dev/nu
 [ -f "$CUSTOM/.github/workflows/devloop-main-guard.yml" ] \
   && ok "installer ships the main-guard workflow" || ko "installer ships the main-guard workflow"
 [ -f "$CUSTOM/scripts/devloop/gate.sh" ] && ok "kit installed after force" || ko "kit installed after force"
+[ "$(stat -c %a "$CUSTOM/.githooks/pre-commit")" = "644" ] \
+  && ok "custom hook keeps its mode after --force" || ko "custom hook keeps its mode after --force"
+[ "$(stat -c %a "$CUSTOM/scripts/devloop/deploy.sh")" = "644" ] \
+  && ok "custom script keeps its mode after --force" || ko "custom script keeps its mode after --force"
+B_BEFORE="$(find "$COMMON/devloop" -maxdepth 1 -type d -name 'backup-*' 2>/dev/null | wc -l)"
+( cd "$CUSTOM" && bash "$INSTALL" --force >/dev/null 2>&1 ) || true
+B_AFTER="$(find "$COMMON/devloop" -maxdepth 1 -type d -name 'backup-*' 2>/dev/null | wc -l)"
+[ "$B_AFTER" -gt "$B_BEFORE" ] \
+  && ok "a second forced install gets a fresh backup" || ko "a second forced install gets a fresh backup"
 
 FRESH="$TMP/install-fresh"
 mkdir -p "$FRESH"
@@ -669,6 +678,18 @@ grep -q "Append only" "$FRESH/docs/LESSONS.md" \
   && ok "fresh LESSONS is a template, not the kit history" || ko "fresh LESSONS is a template, not the kit history"
 [ "$(git -C "$FRESH" config --get core.hooksPath)" = ".githooks" ] \
   && ok "fresh install configures core.hooksPath" || ko "fresh install configures core.hooksPath"
+SYM="$TMP/install-symlink"
+OUT="$TMP/install-outside"
+mkdir -p "$SYM/scripts" "$OUT"
+git -C "$SYM" init -q -b main
+ln -s "$OUT" "$SYM/scripts/devloop"
+SYM_OUT="$( cd "$SYM" && bash "$INSTALL" 2>&1 )"; SYM_CODE=$?
+[ "$SYM_CODE" -eq 4 ] \
+  && ok "installer refuses a symlinked destination" || ko "installer refuses a symlinked destination"
+printf '%s' "$SYM_OUT" | grep -qi "symlink" \
+  && ok "refusal names the symlink" || ko "refusal names the symlink"
+[ -z "$(ls -A "$OUT" 2>/dev/null)" ] \
+  && ok "installer writes nothing through the symlink" || ko "installer writes nothing through the symlink"
 
 say "main guard"
 GUARD="$SRC/.github/workflows/main-guard.yml"
