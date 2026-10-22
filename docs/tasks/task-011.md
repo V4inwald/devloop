@@ -1,6 +1,6 @@
 ---
 id: task-011
-status: review
+status: done
 branch: task/011-guard-script
 created: 2026-10-22
 owner: lead
@@ -38,3 +38,8 @@ Touched: `scripts/devloop/main-guard.sh`, `.github/workflows/main-guard.yml`, `t
 
 - The guard remains detection; a direct push that edits the script or the conf can blind it.
 - The stub tests model the `gh` contract; a real API shape change still needs the CI run.
+
+## Notes / decisions
+
+- 2026-10-22: merged as PR #11; the guard logic is now covered by stub-`gh` tests in the gate.
+  Remaining: detection only (branch protection is the barrier).

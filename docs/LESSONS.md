@@ -87,3 +87,10 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
   until its path regex was extended.
 - 2026-10-21 (task-010): test the checker against the real failing state, not
   only the happy path — reverting the doctor reproduced the 2 errors.
+- 2026-10-22 (task-011): a workflow-only guard is hard to test; move the logic
+  into a script and drive it with a stub `gh`, including the API-failure path.
+- 2026-10-22 (task-012): an installer must chmod only what it installed and must
+  refuse symlinked destinations; both prevent writes to the wrong place.
+- 2026-10-22 (task-013): `prove-red` is advisory, not a gate: it cannot tell a
+  real regression failure from an import/setup error; pair it with a green run
+  on HEAD and a human reading of the failure.
