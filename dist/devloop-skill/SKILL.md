@@ -39,7 +39,7 @@ The installer is **non-destructive**:
 
 - it refuses to overwrite a kit file (exit 4) and lists the conflicts;
 - `--force` overwrites only those files and keeps a backup under
-  `<git-common-dir>/devloop/backup-<utc>`;
+  `<git-common-dir>/devloop/backup-<utc>-<pid>`;
 - it never overwrites `.devloop.conf`, `docs/STATE.md`, `docs/LESSONS.md` or
   `AGENTS.md`, and it never deletes hooks, scripts or workflows it did not create;
 - it installs the CI workflow as `.github/workflows/devloop-ci.yml`, so an
@@ -110,6 +110,10 @@ bash scripts/devloop/gate.sh --task <id>
 - exit 3 → the checks passed but the tree was dirty: **not integrable**, commit and
   re-run. The word `PASSED` is never printed in that case;
 - exit 2 → configuration/usage error (no `CHECK_*`, unknown argument).
+
+To prove a new test is red without the fix:
+`bash scripts/devloop/prove-red.sh <base-rev> -- <test command>`. It copies the changed
+test files into a worktree at the base commit and expects the command to fail there.
 
 Never use `--no-verify`, `|| true`, or a loosened assertion to get through.
 

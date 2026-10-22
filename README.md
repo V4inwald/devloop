@@ -47,6 +47,7 @@ bash scripts/devloop/integrate.sh --task task-001
 | `policy.sh` | vérifie messages de commit, secrets, affaiblissement des tests | violation (utilisé en CI, non contournable par `--no-verify`) |
 | `doctor.sh` | diagnostic lecture seule de l'état du dépôt | erreur de preuve ou d'état |
 | `install-hooks.sh` | installe `core.hooksPath` et exclut `.devloop/` localement | — |
+| `prove-red.sh` | copie les tests modifiés dans un worktree au commit de base et vérifie qu'ils échouent sans le correctif | le test passe sur la base (ce n'est pas un test de régression) |
 
 ## Mémoire : où mettre quoi
 
@@ -61,7 +62,7 @@ Détail et règles d'écriture : `design/03-memory.md`.
 
 ## Ce qui est vérifié dans ce dépôt
 
-- `bash tests/run.sh` : **132 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
+- `bash tests/run.sh` : **134 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
   kit, et vérifie les refus réels : commit hors convention, absence de revue, revue pour un SHA
   inconnu, revue invalidée par un commit de code, arbre sale, diff trop gros, gate rouge, push
   direct sur `main`, push non fast-forward, `--no-verify` rattrapé par `policy.sh`.

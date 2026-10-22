@@ -11,7 +11,7 @@
 # ci.yml is never clobbered.
 #
 # Exit: 0 installed, 2 usage/repo error, 3 already installed (no --force),
-#       4 conflicts found (no --force).
+#       4 conflicts or symlinked destinations found (no --force).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

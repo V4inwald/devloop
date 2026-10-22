@@ -694,6 +694,23 @@ printf '%s' "$SYM_OUT" | grep -qi "symlink" \
 [ -z "$(ls -A "$OUT" 2>/dev/null)" ] \
   && ok "installer writes nothing through the symlink" || ko "installer writes nothing through the symlink"
 
+say "prove red"
+PRR="$TMP/prove-red"
+mkdir -p "$PRR/tests"
+git -C "$PRR" init -q -b main
+git -C "$PRR" config user.name t; git -C "$PRR" config user.email t@x.invalid
+printf '#!/bin/sh\nexit 0\n' > "$PRR/tests/test.sh"
+printf '#!/bin/sh\nexit 0\n' > "$PRR/tests/ok.sh"
+git -C "$PRR" add -A; git -C "$PRR" commit -q -m "test: base"
+printf '#!/bin/sh\nexit 1\n' > "$PRR/tests/test.sh"
+printf '#!/bin/sh\necho ok; exit 0\n' > "$PRR/tests/ok.sh"
+git -C "$PRR" add -A; git -C "$PRR" commit -q -m "test: red"
+( cd "$PRR" && bash "$SRC/scripts/devloop/prove-red.sh" HEAD^ -- bash tests/test.sh >/dev/null 2>&1 ); CODE=$?
+[ "$CODE" -eq 0 ] && ok "prove-red confirms a red test" || ko "prove-red confirms a red test"
+( cd "$PRR" && bash "$SRC/scripts/devloop/prove-red.sh" HEAD^ -- bash tests/ok.sh >/dev/null 2>&1 ); CODE=$?
+[ "$CODE" -eq 1 ] && ok "prove-red rejects a test that is green on the base" \
+  || ko "prove-red rejects a test that is green on the base"
+
 say "main guard"
 GUARD="$SRC/.github/workflows/main-guard.yml"
 GUARD_LOGIC="$SRC/scripts/devloop/main-guard.sh"
