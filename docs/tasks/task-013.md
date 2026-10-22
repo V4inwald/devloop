@@ -1,6 +1,6 @@
 ---
 id: task-013
-status: review
+status: done
 branch: task/013-prove-red
 created: 2026-10-22
 owner: lead
@@ -40,3 +40,9 @@ Touched: `scripts/devloop/prove-red.sh`, `tests/run.sh`, `dist/devloop-skill/SKI
   needs them can fail for the wrong reason. The tool is for self-contained test commands; the
   task notes this.
 - The worktree removes on exit; a killed process can leave one under the temp dir.
+
+## Notes / decisions
+
+- 2026-10-22: merged as PR #13. Heuristic limits: any non-zero exit counts as red (including a
+  setup error) and the test-path detection is filename-based; the base worktree has no untracked
+  dependencies. The tool is advisory, not a gate.

@@ -1,6 +1,6 @@
 ---
 id: task-012
-status: review
+status: done
 branch: task/012-installer-hardening
 created: 2026-10-22
 owner: lead
@@ -40,3 +40,9 @@ Touched: `dist/devloop-skill/install.sh`, `dist/devloop-skill/SKILL.md`, `tests/
   `scripts/devloop`; the error names the path and asks for manual removal. Erring on the safe
   side is intentional: a write through a symlink can escape the repository.
 - The PID suffix is not a security boundary; the loop handles the residual collision.
+
+## Notes / decisions
+
+- 2026-10-22: merged as PR #12. The Scope line mentioned `SKILL.md`; the actual doc fix landed in
+  task-013 (the code/tests were unaffected). The backup-name assertion was made deterministic in
+  the r2 delta.
