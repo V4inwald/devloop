@@ -820,6 +820,10 @@ printf 'REQUIRE_PR="true"\n' > "$TMP/require-pr.conf"
 OUT="$(env DEVLOOP_CONF="$TMP/require-pr.conf" bash scripts/devloop/integrate.sh --task task-001 2>&1 || true)"
 printf '%s' "$OUT" | grep -q "REQUIRE_PR=true" \
   && ok "REQUIRE_PR refuses a local integration" || ko "REQUIRE_PR refuses a local integration"
+grep -q 'REVIEW_REQUIRED' "$SRC/scripts/devloop/integrate.sh" \
+  && grep -q 'reviewDecision' "$SRC/scripts/devloop/integrate.sh" \
+  && ok "integrate stops when the PR needs an owner approval" \
+  || ko "integrate stops when the PR needs an owner approval"
 
 say "public readiness"
 [ -f "$SRC/LICENSE" ] && grep -q "MIT License" "$SRC/LICENSE" \

@@ -229,6 +229,19 @@ if [ "$PR_MODE" -eq 1 ]; then
   timeout "${CI_WAIT_SECONDS:-1800}" gh pr checks "$PR_NUM" --watch --fail-fast \
     || die "PR checks failed or timed out; the PR was not merged"
 
+  # Branch protection may require an owner/reviewer approval. Do not let
+  # gh pr merge fail with a generic error: say exactly what is missing.
+  DECISION="$(gh pr view "$PR_NUM" --json reviewDecision --jq '.reviewDecision // ""' 2>/dev/null || true)"
+  case "$DECISION" in
+    APPROVED|"") ;;
+    REVIEW_REQUIRED)
+      die "PR #$PR_NUM needs an approving review; approve it, then re-run --pr" ;;
+    CHANGES_REQUESTED)
+      die "PR #$PR_NUM has requested changes; address them and re-run --pr" ;;
+    *)
+      die "PR #$PR_NUM has review state '$DECISION'; approve it, then re-run --pr" ;;
+  esac
+
   gh pr merge "$PR_NUM" --merge \
     || die "gh pr merge failed (required checks, protection, or conflict)"
   git push origin --delete "$BRANCH" >/dev/null 2>&1 || true
