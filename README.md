@@ -62,7 +62,7 @@ Détail et règles d'écriture : `design/03-memory.md`.
 
 ## Ce qui est vérifié dans ce dépôt
 
-- `bash tests/run.sh` : **134 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
+- `bash tests/run.sh` : **135 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
   kit, et vérifie les refus réels : commit hors convention, absence de revue, revue pour un SHA
   inconnu, revue invalidée par un commit de code, arbre sale, diff trop gros, gate rouge, push
   direct sur `main`, push non fast-forward, `--no-verify` rattrapé par `policy.sh`.
@@ -86,6 +86,12 @@ bash scripts/devloop/integrate.sh --task <id> --pr
 bookkeeping (`STATE.md`, `LESSONS.md`) passe par une courte PR `state/<sha>`. Avec un seul
 compte GitHub, aucune approbation GitHub n'est exigée (on ne peut pas approuver sa propre PR) ;
 la revue fichier `docs/reviews/` reste le gate de processus.
+
+**Revue owner** : la protection exige **1 approbation**. L'agent `comptetest101` ouvre la PR,
+le check `gate` passe, puis `integrate.sh --pr` s'arrête sur `REVIEW_REQUIRED` ; le reviewer
+(l'humain ou l'agent isolé du container `.reviewer/`) approuve, et l'agent relance `--pr` pour
+merger. Le modèle d'identité et l'isolation sont dans
+[`docs/security/identity-model.md`](docs/security/identity-model.md).
 
 **Limite du plan** : GitHub Free ne fournit pas branch protection ni rulesets sur un dépôt
 **privé**. `protect.sh` le détecte et explique les options. En privé sur Free, `main-guard`
