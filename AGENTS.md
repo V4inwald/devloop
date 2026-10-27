@@ -29,9 +29,8 @@ rewritten. Nothing else is exempt, and the update must not touch code or tests. 
 
 Evidence is bound to a commit SHA, not to a conversation:
 
-- `scripts/devloop/gate.sh` writes `$(git rev-parse --git-common-dir)/devloop/gate/<sha>/result.json`.
-  The store is shared by every worktree and never sits inside the worktree. A dirty tree exits
-  3 and prints `UNVERIFIED`; it is never a passing result.
+- `scripts/devloop/gate.sh` writes `$(git rev-parse --git-common-dir)/devloop/gate/<sha>/result.json`
+  — shared by all worktrees, never inside one. A dirty tree exits 3 with `UNVERIFIED`; never a pass.
 - A review file `docs/reviews/<task>-r<N>.md` names the exact `sha:` it approved, its `task:`,
   and `contract: approved` when the branch touches contract paths. The file must be **added
   after** the reviewed commit; its blob is pinned in the integration record and the merge
@@ -98,16 +97,13 @@ Do not copy details into `AGENTS.md`. It must stay small enough to be read at ev
 - The review declares `task:`, `sha:`, `reviewer:`, and `contract:` when the branch changes a
   contract path. `reviewer: self` requires `approved_by:` and explicit human approval.
 - `approve` requires zero blockers. "Looks fine" without per-rubric evidence is not a review.
-- Maximum two review rounds; after that escalate to the human.
-- Team mode: one writer per worktree, one integrator at a time, one review per task. The review
-  file is the handoff artefact — never a chat message, never a shared draft.
+- Maximum two review rounds, then escalate. Team mode: one writer per worktree, one integrator at
+  a time, one review per task; the review file is the handoff artefact, never a chat message.
 
 ## 8. Session start
 
-1. Read `docs/STATE.md`.
-2. Run `bash scripts/devloop/doctor.sh`; if it reports errors, fix them before new work.
-3. Read the task file you are about to work on.
-4. If state is stale (`last_verified_sha` != HEAD), re-verify before trusting it.
+Read `docs/STATE.md`; run `bash scripts/devloop/doctor.sh` and fix errors first; read your task
+file; if `last_verified_sha` != HEAD, re-verify before trusting the state.
 
 ## 9. Escalate to the human
 
@@ -126,3 +122,19 @@ State what you need, the options, and your recommendation. Do not guess silently
 - [ ] Review file approved that SHA with zero blockers; its blob is recorded.
 - [ ] Merge performed by `integrate.sh`, and the merge result passed the gate.
 - [ ] `docs/STATE.md` updated; lesson or ADR recorded if applicable.
+
+## 11. Operating rules (every task)
+
+1. **Run it, don't recite it.** A command whose purpose is to run now is run now. Never hand the
+   human a command as prose when you can execute it; report the exit code and the line that matters.
+2. **Evidence before claim.** Re-open what you wrote and re-run the check before saying done. A
+   claim without `command -> result` or `path:line` is not a report.
+3. **Never invent a path, version, id or value.** Observe it (`test -e`, `--version`, `rg`) or tag
+   it `ASSUMED:` / `UNKNOWN:`.
+4. **A document is done only after it is re-read** — structure, links, figures, and every quoted
+   value checked against its source.
+5. **Verify every write in place.** Read the edited region after `write`/`edit`; Bash, formatters
+   and codegen bypass the version guard and are checked by hand.
+
+When a task changes how agents work — `AGENTS.md`, a skill, a gate, a template — load the
+`harness-improvement` skill before the first edit.
