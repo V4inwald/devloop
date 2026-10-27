@@ -1,6 +1,6 @@
 ---
 id: task-016
-status: review
+status: done
 branch: task/016-harness-check
 created: 2026-10-27
 owner: lead
@@ -17,16 +17,16 @@ fautives.
 
 ## Acceptance criteria
 
-- [ ] AC1: `bash scripts/devloop/harness-check.sh` sort 0 sur ce dépôt et affiche `OK`.
-- [ ] AC2: il sort 1 pour chacun des cinq cas : skill orpheline, `{{` dans `AGENTS.md`, script
+- [x] AC1: `bash scripts/devloop/harness-check.sh` sort 0 sur ce dépôt et affiche `OK`.
+- [x] AC2: il sort 1 pour chacun des cinq cas : skill orpheline, `{{` dans `AGENTS.md`, script
       nommé absent, `AGENTS.md` de 160 lignes, `AGENTS.md` absent.
-- [ ] AC3: `bash tests/run.sh` passe, avec 7 assertions de plus qu'avant (134 → 141).
-- [ ] AC4: `.devloop.conf` exécute le script via `CHECK_LINT` ; `bash scripts/devloop/gate.sh`
+- [x] AC3: `bash tests/run.sh` passe, avec 7 assertions de plus qu'avant (134 → 141).
+- [x] AC4: `.devloop.conf` exécute le script via `CHECK_LINT` ; `bash scripts/devloop/gate.sh`
       sort 0 sur un arbre propre.
-- [ ] AC5: le miroir `dist/devloop-skill/assets/scripts/devloop/harness-check.sh` est identique.
-- [ ] AC6: `README.md` annonce le compte d'assertions réel et l'adoption opt-in.
-- [ ] AC7: une revue indépendante approuve ce SHA avec `contract: approved` (`.devloop.conf`).
-- [ ] AC8 (r2): `timeout 3 bash scripts/devloop/harness-check.sh --root` sort 2 immédiatement,
+- [x] AC5: le miroir `dist/devloop-skill/assets/scripts/devloop/harness-check.sh` est identique.
+- [x] AC6: `README.md` annonce le compte d'assertions réel et l'adoption opt-in.
+- [x] AC7: une revue indépendante approuve ce SHA avec `contract: approved` (`.devloop.conf`).
+- [x] AC8 (r2): `timeout 3 bash scripts/devloop/harness-check.sh --root` sort 2 immédiatement,
       sans blocage (blocker 1 de `docs/reviews/task-016-r1.md`).
 
 ## Scope

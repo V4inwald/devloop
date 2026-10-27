@@ -94,3 +94,11 @@ Format: `- YYYY-MM-DD (task-NNN): <what happened> → <what to do differently>.`
 - 2026-10-22 (task-013): `prove-red` is advisory, not a gate: it cannot tell a
   real regression failure from an import/setup error; pair it with a green run
   on HEAD and a human reading of the failure.
+- 2026-10-27 (task-016): a script parsing argv must guard `shift 2` with `$# -ge 2`; a bare
+  `--root` looped forever instead of exiting 2 — test the flag without its value.
+- 2026-10-27 (task-016): `packet.sh` warns on diff text lines, `integrate.sh` counts changed
+  lines excluding `docs/reviews/` — measure with `git diff --numstat` before splitting.
+- 2026-10-27 (task-017): a probe baseline green on every probe means the probes are too weak,
+  not that behaviour is fine; harden the variant before using a probe as evidence.
+- 2026-10-27 (task-015/016): when `main` moves during review, merging it in forces another
+  review round and the pre-push hook forbids rewriting the branch — branch late or expect it.

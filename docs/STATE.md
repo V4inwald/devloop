@@ -1,9 +1,9 @@
 # STATE — current truth
 
 ```yaml
-last_verified_sha: f170d9a54cc13982d38c4d5f1e9c797e645ce87f
-last_verified_at: 2026-10-22
-current_focus: maintenance; quality backlog is optional
+last_verified_sha: 657a55426519327ff0b77455991a4d123cf42cd6
+last_verified_at: 2026-10-27
+current_focus: harness improvement landed (rules, skill, gate checker, probes, ADR 0003)
 ```
 
 ## Working now
@@ -17,19 +17,24 @@ current_focus: maintenance; quality backlog is optional
   covered six failure paths with a stub `gh`; task-012 hardened the installer
   (PID-suffixed backups, chmod only on kit files, symlink refusal); task-013
   added `prove-red.sh` and corrected the installer docs.
-- `bash tests/run.sh` = 134 assertions; doctor = 0 error. Branch protection is
+- task-015..017 landed the harness-improvement loop: `AGENTS.md` §11 (five operating rules,
+  150-line ceiling), the `harness-improvement` skill, `harness-check.sh` wired into
+  `CHECK_LINT`, six probes (`docs/harness/PROBES.md`) and ADR 0003.
+- `bash tests/run.sh` = 142 assertions. Branch protection is
   active (`gate`, admins, PR, no force-push/deletion); secret scanning and push
   protection are enabled.
 
 ## Next actions (optional backlog)
 
-1. AC-as-code: declare checks in the task frontmatter and let the gate execute
+1. Harden the probes (P1b/P2b/P3b) and run P4-P6: the 2026-10-27 baseline was
+   green on P1-P3, so the six probes are regression guards, not defect demos.
+2. AC-as-code: declare checks in the task frontmatter and let the gate execute
    them. Needs a YAML-list parser and a design decision; not started.
-2. One shared review matcher (`review_covers`) for doctor and integrate; the
+3. One shared review matcher (`review_covers`) for doctor and integrate; the
    current duplicate works but is a maintenance risk in the safety-critical path.
-3. Static analysis in CI (`shellcheck`, `actionlint`, `gitleaks`); evaluate the
+4. Static analysis in CI (`shellcheck`, `actionlint`, `gitleaks`); evaluate the
    warning volume before wiring it into the required check.
-4. Guard residual: detection only; a direct push that edits the workflow/conf
+5. Guard residual: detection only; a direct push that edits the workflow/conf
    can blind it. Branch protection remains the barrier.
 
 ## Known issues
@@ -44,6 +49,12 @@ current_focus: maintenance; quality backlog is optional
 - The guard is detection, not prevention; the history rewrite risk is unchanged.
 - A state-only PR merge once produced no push workflow run (PR #4); protected
   PRs #6..#13 did trigger. Watch this if a state merge looks untested.
+- Doctor reports one ERROR on `main` after a GitHub-only PR merge: the merge commit
+  has no review and no local integration record. The branch reviews and the merge
+  gate are green; treat it as a reporting gap, not a merge bypass.
+- `packet.sh` warns when the unified-diff TEXT exceeds 400 lines, while
+  `integrate.sh` counts added+removed lines excluding `docs/reviews/`; measure with
+  `git diff --numstat` before deciding to split.
 
 ## Environment notes
 
@@ -51,4 +62,4 @@ current_focus: maintenance; quality backlog is optional
 - GitHub: public repo, Free plan, branch protection active. The workspace
   GitHub environment is sourced outside the repository; `gh` uses a writable
   cache directory. Never commit `.gh`, `.github-env`, `.env` or a key.
-- Full check: `bash scripts/devloop/gate.sh` (LINT + 134 tests).
+- Full check: `bash scripts/devloop/gate.sh` (LINT + 142 tests + harness-check).
