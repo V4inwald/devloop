@@ -18,7 +18,10 @@ QUIET=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --root) ROOT="${2:-}"; shift 2 ;;
+    --root)
+      [ $# -ge 2 ] || { printf 'usage: harness-check.sh [--root <dir>] [-q]\n' >&2; exit 2; }
+      ROOT="$2"; shift 2
+      ;;
     -q) QUIET=1; shift ;;
     *) printf 'usage: harness-check.sh [--root <dir>] [-q]\n' >&2; exit 2 ;;
   esac
@@ -45,7 +48,8 @@ if [ -d "$ROOT/.agents/skills" ]; then
     [ -d "$dir" ] || continue
     name="$(basename "$dir")"
     SKILL_COUNT=$((SKILL_COUNT + 1))
-    grep -qF -- "$name" "$AGENTS" || fail "skill '$name' is not named verbatim in AGENTS.md"
+    grep -qE "(^|[^[:alnum:]_-])${name}([^[:alnum:]_-]|\$)" "$AGENTS" \
+      || fail "skill '$name' is not named verbatim in AGENTS.md"
   done
 fi
 
@@ -67,7 +71,7 @@ done < <(
 )
 
 # 4. always-on budget.
-LINES="$(wc -l < "$AGENTS" | tr -d '[:space:]')"
+LINES="$(awk 'END { print NR }' "$AGENTS")"
 [ "${LINES:-0}" -le "$MAX_AGENTS_LINES" ] \
   || fail "AGENTS.md has $LINES lines (limit $MAX_AGENTS_LINES)"
 

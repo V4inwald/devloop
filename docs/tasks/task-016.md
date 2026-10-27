@@ -26,6 +26,8 @@ fautives.
 - [ ] AC5: le miroir `dist/devloop-skill/assets/scripts/devloop/harness-check.sh` est identique.
 - [ ] AC6: `README.md` annonce le compte d'assertions réel et l'adoption opt-in.
 - [ ] AC7: une revue indépendante approuve ce SHA avec `contract: approved` (`.devloop.conf`).
+- [ ] AC8 (r2): `timeout 3 bash scripts/devloop/harness-check.sh --root` sort 2 immédiatement,
+      sans blocage (blocker 1 de `docs/reviews/task-016-r1.md`).
 
 ## Scope
 
