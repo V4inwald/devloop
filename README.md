@@ -62,11 +62,14 @@ Détail et règles d'écriture : `design/03-memory.md`.
 
 ## Ce qui est vérifié dans ce dépôt
 
-- `bash tests/run.sh` : **135 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
+- `bash tests/run.sh` : **142 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
   kit, et vérifie les refus réels : commit hors convention, absence de revue, revue pour un SHA
   inconnu, revue invalidée par un commit de code, arbre sale, diff trop gros, gate rouge, push
   direct sur `main`, push non fast-forward, `--no-verify` rattrapé par `policy.sh`.
-- Les trois skills de `.agents/skills/` sont apparus dans le catalogue de la session DSH sans
+- `bash scripts/devloop/harness-check.sh` : **4 contrôles structurels** — skill nommée verbatim
+  dans `AGENTS.md`, pas de `{{`/`{%`, scripts cités existants, `AGENTS.md` ≤ 150 lignes.
+  Adoption opt-in : l'ajouter à `CHECK_LINT`.
+- Les quatre skills de `.agents/skills/` sont apparus dans le catalogue de la session DSH sans
   redémarrage : la découverte de skills telle que décrite par `dsh-skill-filesystem` fonctionne.
 - `AGENTS.md` racine est bien injecté comme consignes de l'espace de travail.
 - Le workflow GitHub Actions **a été exécuté** sur le dépôt privé

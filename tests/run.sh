@@ -843,6 +843,34 @@ git commit -qam "chore(math): add n"
 expect_fail "doctor flags a commit with no gate or review" bash scripts/devloop/doctor.sh
 git switch -q main
 
+say "harness check"
+HC="$SRC/scripts/devloop/harness-check.sh"
+HC_TMP="$TMP/harness-check"
+mkdir -p "$HC_TMP"
+hc_root() { # <name> ; minimal root whose AGENTS.md names the alpha skill
+  mkdir -p "$HC_TMP/$1/.agents/skills/alpha"
+  printf -- '---\nname: alpha\n---\n# alpha\n' > "$HC_TMP/$1/.agents/skills/alpha/SKILL.md"
+  printf 'Load the `alpha` skill.\n' > "$HC_TMP/$1/AGENTS.md"
+}
+expect_ok "harness-check passes on the kit" bash "$HC" --root "$SRC" -q
+hc_root ok
+expect_ok "harness-check accepts a named skill" bash "$HC" --root "$HC_TMP/ok" -q
+hc_root orphan
+mkdir -p "$HC_TMP/orphan/.agents/skills/beta"
+printf 'x\n' > "$HC_TMP/orphan/.agents/skills/beta/SKILL.md"
+expect_fail "harness-check rejects an orphan skill" bash "$HC" --root "$HC_TMP/orphan" -q
+hc_root braces
+printf 'Rule {{ x }}\n' >> "$HC_TMP/braces/AGENTS.md"
+expect_fail "harness-check rejects template syntax" bash "$HC" --root "$HC_TMP/braces" -q
+hc_root script
+printf 'Run `scripts/devloop/ghost.sh`.\n' >> "$HC_TMP/script/AGENTS.md"
+expect_fail "harness-check rejects a phantom script" bash "$HC" --root "$HC_TMP/script" -q
+hc_root long
+for i in $(seq 1 160); do printf 'line %s\n' "$i"; done >> "$HC_TMP/long/AGENTS.md"
+expect_fail "harness-check rejects an oversized AGENTS.md" bash "$HC" --root "$HC_TMP/long" -q
+mkdir -p "$HC_TMP/none"
+expect_fail "harness-check rejects a missing AGENTS.md" bash "$HC" --root "$HC_TMP/none" -q
+
 say "results"
 printf 'passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
