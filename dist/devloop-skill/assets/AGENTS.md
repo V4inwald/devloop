@@ -64,7 +64,9 @@ plan allows it**; GitHub Free cannot protect a private branch. On that plan the 
 `main-guard` workflow detects a non-PR push (issue + red job) but does not prevent it;
 prevention requires a public repository or GitHub Pro/Team. The bookkeeping exception still
 applies in substance, but it travels through a short `state/<sha>` pull request when
-protection (or `REQUIRE_PR=true`) is in force.
+protection (or `REQUIRE_PR=true`) is in force. With `REQUIRED_APPROVALS=1`, the agent opens the
+PR and stops on `REVIEW_REQUIRED`; the owner/reviewer approves and the agent re-runs `--pr`.
+The roles, token scopes and isolation rules are in `docs/security/identity-model.md`.
 
 ## 5. Memory map
 
