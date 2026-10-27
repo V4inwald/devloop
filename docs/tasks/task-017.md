@@ -23,7 +23,7 @@ enregistre la décision d'adopter la boucle Harness² adaptée, ses conséquence
 - [ ] AC3: `docs/adr/0003-harness-improvement-loop.md` porte `Statut : accepted` et les sections
       Contexte, Décision, Conséquences, Alternatives écartées.
 - [ ] AC4: les deux chemins cités dans `docs/harness/PROBES.md` existent
-      (`test -f .githooks/commit-msg scripts/devloop/policy.sh`).
+      (`test -f .githooks/commit-msg && test -f scripts/devloop/policy.sh`).
 - [ ] AC5: `bash scripts/devloop/gate.sh` sort 0 sur un arbre propre.
 - [ ] AC6: une revue indépendante approuve ce SHA.
 
@@ -36,7 +36,7 @@ Out of scope: `AGENTS.md`, `.agents/skills/**`, `scripts/**`, `.devloop.conf`, `
 
 ## Verification plan
 
-1. `test -f .githooks/commit-msg scripts/devloop/policy.sh` → exit 0.
+1. `test -f .githooks/commit-msg && test -f scripts/devloop/policy.sh` → exit 0.
 2. `bash scripts/devloop/gate.sh` sur arbre propre.
 3. Revue indépendante (documentaire).
 

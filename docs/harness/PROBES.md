@@ -51,7 +51,7 @@ variantes durcies sont la version à utiliser pour chercher un défaut.
 Format d'une ligne, dans le task file du changement :
 
 ```
-2026-10-27 | task-015 | P2 | PASS | <observation> | 8e2e254 | 1 exécution
+2026-10-27 | task-NNN | P2 | PASS | <observation> | 8e2e254 | 1 exécution
 ```
 
 Une leçon n'entre dans `docs/LESSONS.md` que si un contraste la soutient ; sinon `NO_ENTRY`.
