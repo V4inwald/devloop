@@ -186,6 +186,11 @@ syncs `main`. `protect.sh` installs/refreshes the protection (required `gate`, a
 enforced, no force-push or deletion). With protection on, the bookkeeping commit
 (`STATE.md`/`LESSONS.md`) also goes through a short `state/<sha>` PR; never hand-push `main`.
 
+When the repository requires an owner approval (`REQUIRED_APPROVALS=1`), `--pr` stops at
+`REVIEW_REQUIRED` with an actionable message: the owner/reviewer approves on GitHub, then the
+agent re-runs `--pr` and merges. The identity model and isolation rules are in
+`docs/security/identity-model.md`.
+
 Protection depends on the GitHub plan: **branch protection and rulesets are unavailable on a
 private repository on GitHub Free**. On that plan, the shipped `main-guard` workflow detects a
 push to `main` that is not a verified pull-request merge (issue + red job); it is detection,

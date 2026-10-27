@@ -57,3 +57,6 @@ Out of scope: `AGENTS.md`, `.agents/skills/**`, version du kit, `dist/devloop-sk
 - 2026-10-27: adoption opt-in côté kit (le script est livré, `CHECK_LINT` de l'exemple n'est pas
   modifié) pour ne pas casser les dépôts déjà installés.
 - 2026-10-27: `harness-check.sh` est écrit en Bash pur, sans dépendance hors `grep`, `sort`, `wc`.
+- 2026-10-27 (merge): `main` a intégré `task-014` (+1 assertion) avant cette branche ; la base
+  compte donc 135 assertions et la suite 142. Le delta de +7 assertions de `task-016` est
+  inchangé ; AC3 (134 → 141) décrit la base d'origine.
