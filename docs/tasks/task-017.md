@@ -1,6 +1,6 @@
 ---
 id: task-017
-status: review
+status: done
 branch: task/017-harness-probes
 created: 2026-10-27
 owner: lead
@@ -16,16 +16,16 @@ enregistre la décision d'adopter la boucle Harness² adaptée, ses conséquence
 
 ## Acceptance criteria
 
-- [ ] AC1: `docs/harness/PROBES.md` contient six sondes avec colonnes PASS et FAIL, plus les
+- [x] AC1: `docs/harness/PROBES.md` contient six sondes avec colonnes PASS et FAIL, plus les
       variantes durcies et la section baseline.
-- [ ] AC2: la baseline nomme le SHA `8e2e254`, les résultats P1-P3 et la limite honnête
+- [x] AC2: la baseline nomme le SHA `8e2e254`, les résultats P1-P3 et la limite honnête
       (« ces sondes ne démontrent pas un défaut actuel »).
-- [ ] AC3: `docs/adr/0003-harness-improvement-loop.md` porte `Statut : accepted` et les sections
+- [x] AC3: `docs/adr/0003-harness-improvement-loop.md` porte `Statut : accepted` et les sections
       Contexte, Décision, Conséquences, Alternatives écartées.
-- [ ] AC4: les deux chemins cités dans `docs/harness/PROBES.md` existent
+- [x] AC4: les deux chemins cités dans `docs/harness/PROBES.md` existent
       (`test -f .githooks/commit-msg && test -f scripts/devloop/policy.sh`).
-- [ ] AC5: `bash scripts/devloop/gate.sh` sort 0 sur un arbre propre.
-- [ ] AC6: une revue indépendante approuve ce SHA.
+- [x] AC5: `bash scripts/devloop/gate.sh` sort 0 sur un arbre propre.
+- [x] AC6: une revue indépendante approuve ce SHA.
 
 ## Scope
 

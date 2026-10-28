@@ -1,6 +1,6 @@
 ---
 id: task-015
-status: review
+status: done
 branch: task/015-harness-improvement-skill
 created: 2026-10-27
 owner: lead
@@ -17,18 +17,18 @@ déclenchement qui rend la skill découvrable — sans dépasser 150 lignes.
 
 ## Acceptance criteria
 
-- [ ] AC1: `.agents/skills/harness-improvement/SKILL.md` a un front-matter `name` égal au nom du
+- [x] AC1: `.agents/skills/harness-improvement/SKILL.md` a un front-matter `name` égal au nom du
       dossier, plus `description` et `whenToUse` (`head -6`).
-- [ ] AC2: `AGENTS.md` contient la chaîne `harness-improvement` et une section
+- [x] AC2: `AGENTS.md` contient la chaîne `harness-improvement` et une section
       `## 11. Operating rules` avec exactement 5 règles numérotées
       (`grep -c '^[0-9]\. \*\*' AGENTS.md` → 5).
-- [ ] AC3: `wc -l < AGENTS.md` ≤ 150.
-- [ ] AC4: `diff -r .agents/skills dist/devloop-skill/assets/.agents/skills` et
+- [x] AC3: `wc -l < AGENTS.md` ≤ 150.
+- [x] AC4: `diff -r .agents/skills dist/devloop-skill/assets/.agents/skills` et
       `diff -q AGENTS.md dist/devloop-skill/assets/AGENTS.md` ne produisent aucune sortie.
-- [ ] AC5: `bash scripts/devloop/gate.sh` sort 0 sur un arbre propre, résultat lié au SHA.
-- [ ] AC6: une revue indépendante approuve ce SHA avec `contract: approved` (AGENTS.md est un
+- [x] AC5: `bash scripts/devloop/gate.sh` sort 0 sur un arbre propre, résultat lié au SHA.
+- [x] AC6: une revue indépendante approuve ce SHA avec `contract: approved` (AGENTS.md est un
       chemin de contrat).
-- [ ] AC7: aucune règle existante n'est supprimée ; les seules coupes sont §3 (1 ligne), §7
+- [x] AC7: aucune règle existante n'est supprimée ; les seules coupes sont §3 (1 ligne), §7
       (2 lignes), §8 (2 lignes), listées dans « Notes ».
 
 ## Scope
