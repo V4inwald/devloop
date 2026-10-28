@@ -28,6 +28,12 @@ d'ouvrir une seconde PR ; `doctor.sh` certifie ensuite `main`.
 - [ ] AC5: revue indépendante approuve ce SHA avec `contract: approved` (`scripts/devloop` touché).
 - [ ] AC6 (r3): le mode fusionné ne pousse pas la branche (assertion `ls-remote` dans le test).
 - [ ] AC7 (r3): un merge à un seul parent (squash) est refusé (test dédié).
+- [ ] AC8 (r4): main avance d'un commit de contrat après le fork → aucun faux refus, `base` = point
+      de fork, `diff_lines` exclut les lignes de main (test).
+- [ ] AC9 (r4): contrat refusé en mode fusionné sans `contract: approved`, aucun record (test).
+- [ ] AC10 (r4): taille refusée en mode fusionné, aucun record (test).
+- [ ] AC11 (r4): aucun record pour un squash refusé ; `doctor.sh` sort 0 après enregistrement (tests).
+- [ ] AC12 (r4): une seule fonction `check_contract_and_size`, appelée par les deux voies.
 
 ## Scope
 
@@ -37,7 +43,7 @@ Out of scope: `gate.sh`, `doctor.sh`, `.devloop.conf`, `AGENTS.md`, le mode loca
 
 ## Verification plan
 
-1. `bash tests/run.sh` — section « owner-merged pr » (6 assertions).
+1. `bash tests/run.sh` — 157 assertions, dont la section « owner-merged pr » et les cinq tests r4.
 2. `bash scripts/devloop/gate.sh` sur arbre propre.
 3. Après merge : `doctor.sh` ne dit plus « not an integration merge » sur `main`.
 
@@ -45,8 +51,11 @@ Out of scope: `gate.sh`, `doctor.sh`, `.devloop.conf`, `AGENTS.md`, le mode loca
 
 - Détection trop large : on exige `reviewDecision` APPROVED (ou vide), un head identique à HEAD et
   un merge à deux parents.
-- La factorisation contrat/taille est rejouée sur la bonne base ; les tests existants couvrent les
-  refus de la voie normale.
+- Contrat et taille passent par une seule fonction `check_contract_and_size`, appelée par la voie
+  normale et par la voie fusionnée, avec `BASE` = point de fork.
 - 2026-10-28 (r3): le owner a demandé sur PR #20 l'assertion « sans push » et le test du merge à un
   seul parent ; le message du commit 8c61838 les annonçait à tort. AC4 (148) décrit la r2 ; la
   suite compte 150 en r3. Ronde 3 explicitement autorisée par le owner.
+- 2026-10-28 (r4): le owner a demandé `BASE = merge-base(SHA, <merge>^1)`, la factorisation du
+  contrôle et cinq tests. Le diff projet fait 489 lignes : dépassement de `MAX_DIFF_LINES`
+  explicitement autorisé par le owner, intégration prévue avec `--allow-oversized`.

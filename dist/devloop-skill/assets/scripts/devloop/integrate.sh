@@ -151,22 +151,23 @@ if [ "$REVIEWED_SHA" != "$SHA" ]; then
   echo "devloop: review covers $REVIEWED_SHA; later commits only add docs/reviews/ (allowed)"
 fi
 
-# --- contract paths --------------------------------------------------------
-CHANGED="$(git diff --name-only "$BASE..$SHA")"
-TOUCHED=""
+# --- contract paths and size (single check, both integration modes) -------
 [ -n "$CONTRACT_PATHS" ] || die "CONTRACT_PATHS resolved empty; refusing to skip the contract check"
-for p in $CONTRACT_PATHS; do
-  if printf '%s\n' "$CHANGED" | grep -qE "^${p}(/|$)"; then TOUCHED="${TOUCHED:+$TOUCHED }$p"; fi
-done
-if [ -n "$TOUCHED" ] && [ "$REVIEW_CONTRACT" != "approved" ]; then
-  die "this change touches contract paths: $TOUCHED; the review must declare 'contract: approved'"
-fi
-
-# --- size ------------------------------------------------------------------
-LINES="$(diff_lines "$BASE")"
-if [ "$LINES" -gt "$MAX_DIFF_LINES" ] && [ "$ALLOW_OVERSIZED" -eq 0 ]; then
-  die "diff is $LINES lines, above MAX_DIFF_LINES=$MAX_DIFF_LINES; split the task or pass --allow-oversized"
-fi
+check_contract_and_size() {
+  CHANGED="$(git diff --name-only "$BASE..$SHA")"
+  TOUCHED=""
+  for p in $CONTRACT_PATHS; do
+    if printf '%s\n' "$CHANGED" | grep -qE "^${p}(/|$)"; then TOUCHED="${TOUCHED:+$TOUCHED }$p"; fi
+  done
+  if [ -n "$TOUCHED" ] && [ "$REVIEW_CONTRACT" != "approved" ]; then
+    die "this change touches contract paths: $TOUCHED; the review must declare 'contract: approved'"
+  fi
+  LINES="$(diff_lines "$BASE")"
+  if [ "$LINES" -gt "$MAX_DIFF_LINES" ] && [ "$ALLOW_OVERSIZED" -eq 0 ]; then
+    die "diff is $LINES lines, above MAX_DIFF_LINES=$MAX_DIFF_LINES; split the task or pass --allow-oversized"
+  fi
+}
+check_contract_and_size
 
 # --- CI (optional, needs an authenticated gh + a remote) -------------------
 if [ "$REQUIRE_CI" = "true" ] && [ "$PR_MODE" -eq 0 ]; then
@@ -227,19 +228,8 @@ if [ "$PR_MODE" -eq 1 ]; then
       || die "merge commit $MERGE_SHA is not on origin/$MAIN_BRANCH; refusing to record it"
     [ "$(git rev-list --parents -n 1 "$MERGE_SHA" | wc -w | tr -d ' ')" -eq 3 ] \
       || die "$MERGE_SHA is not a two-parent merge commit; refusing to record it"
-    BASE="$(git rev-parse "$MERGE_SHA^1")"
-    CHANGED="$(git diff --name-only "$BASE..$SHA")"
-    TOUCHED=""
-    for p in $CONTRACT_PATHS; do
-      if printf '%s\n' "$CHANGED" | grep -qE "^${p}(/|$)"; then TOUCHED="${TOUCHED:+$TOUCHED }$p"; fi
-    done
-    if [ -n "$TOUCHED" ] && [ "$REVIEW_CONTRACT" != "approved" ]; then
-      die "this change touches contract paths: $TOUCHED; the review must declare 'contract: approved'"
-    fi
-    LINES="$(diff_lines "$BASE")"
-    if [ "$LINES" -gt "$MAX_DIFF_LINES" ] && [ "$ALLOW_OVERSIZED" -eq 0 ]; then
-      die "diff is $LINES lines, above MAX_DIFF_LINES=$MAX_DIFF_LINES; split the task or pass --allow-oversized"
-    fi
+    BASE="$(git merge-base "$SHA" "$MERGE_SHA^1")"
+    check_contract_and_size
   else
     git push -u origin "$BRANCH" || die "cannot push $BRANCH to origin"
     PR_NUM="$(gh pr list --head "$BRANCH" --base "$MAIN_BRANCH" --state open --json number --jq '.[0].number // empty')"
