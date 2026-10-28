@@ -26,6 +26,8 @@ d'ouvrir une seconde PR ; `doctor.sh` certifie ensuite `main`.
       normale, vérifié en revue).
 - [ ] AC4: `bash tests/run.sh` passe (148 assertions) et `gate.sh` sort 0 sur arbre propre.
 - [ ] AC5: revue indépendante approuve ce SHA avec `contract: approved` (`scripts/devloop` touché).
+- [ ] AC6 (r3): le mode fusionné ne pousse pas la branche (assertion `ls-remote` dans le test).
+- [ ] AC7 (r3): un merge à un seul parent (squash) est refusé (test dédié).
 
 ## Scope
 
@@ -45,3 +47,6 @@ Out of scope: `gate.sh`, `doctor.sh`, `.devloop.conf`, `AGENTS.md`, le mode loca
   un merge à deux parents.
 - La factorisation contrat/taille est rejouée sur la bonne base ; les tests existants couvrent les
   refus de la voie normale.
+- 2026-10-28 (r3): le owner a demandé sur PR #20 l'assertion « sans push » et le test du merge à un
+  seul parent ; le message du commit 8c61838 les annonçait à tort. AC4 (148) décrit la r2 ; la
+  suite compte 150 en r3. Ronde 3 explicitement autorisée par le owner.

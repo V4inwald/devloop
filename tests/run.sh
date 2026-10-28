@@ -914,6 +914,24 @@ REC="$ART_DIR/integrations/$MERGE_050.json"
   && ok "record names the PR head" || ko "record names the PR head"
 [ "$(jq -r .base "$REC" 2>/dev/null)" = "$(git rev-parse "$MERGE_050^1")" ] \
   && ok "record base is the merge first parent" || ko "record base is the merge first parent"
+[ -z "$(git ls-remote --heads origin task/050-owner-merge 2>/dev/null)" ] \
+  && ok "merged path does not push the branch" || ko "merged path does not push the branch"
+
+# A single-parent (squash-style) merge must be refused.
+git switch -q main
+printf '\n// squashed\n' >> src/math.js
+git add -A
+git commit -q -m "fix(math): squashed owner merge"
+SQUASH_SHA="$(git rev-parse HEAD)"
+env ALLOW_MAIN_PUSH=1 git push -q origin main
+git switch -q task/050-owner-merge
+SQUASH_JSON="$(jq -nc --arg m "$SQUASH_SHA" --arg h "$PR_HEAD" \
+  '{number:50,url:"https://example.invalid/pr/50",mergeCommit:{oid:$m},reviewDecision:"APPROVED",headRefOid:$h}')"
+OUT="$(env PATH="$TMP/fakebin-merge:$PATH" FAKE_MERGED_JSON="$SQUASH_JSON" \
+  bash scripts/devloop/integrate.sh --task task-050 --pr 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "two-parent merge" \
+  && ok "integrate refuses a single-parent owner merge" \
+  || ko "integrate refuses a single-parent owner merge"
 FAKE_MERGE="$(printf 'f%.0s' $(seq 1 40))"
 MOVED_JSON="$(jq -nc --arg m "$FAKE_MERGE" --arg h "$(printf '0%.0s' $(seq 1 40))" \
   '{number:50,url:"https://example.invalid/pr/50",mergeCommit:{oid:$m},reviewDecision:"APPROVED",headRefOid:$h}')"
