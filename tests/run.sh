@@ -871,6 +871,62 @@ expect_fail "harness-check rejects an oversized AGENTS.md" bash "$HC" --root "$H
 mkdir -p "$HC_TMP/none"
 expect_fail "harness-check rejects a missing AGENTS.md" bash "$HC" --root "$HC_TMP/none" -q
 
+say "owner-merged pr"
+git remote get-url origin >/dev/null 2>&1 || git remote add origin "$TMP/remote.git"
+env ALLOW_MAIN_PUSH=1 git push -q origin main
+start_task task-050 050-owner-merge
+printf '\nexport function minus(a, b) { return a - b; }\n' >> src/math.js
+git add -A
+git commit -q -m "feat(math): add minus"
+bash scripts/devloop/gate.sh --quiet
+HEAD_050="$(git rev-parse HEAD)"
+write_review docs/reviews/task-050-r1.md "$HEAD_050" approve 0 task-050
+bash scripts/devloop/gate.sh --quiet
+PR_HEAD="$(git rev-parse HEAD)"
+git switch -q main
+git merge -q --no-ff "$PR_HEAD" -m "Merge pull request #50 from o/task/050-owner-merge"
+MERGE_050="$(git rev-parse HEAD)"
+env ALLOW_MAIN_PUSH=1 git push -q origin main
+git switch -q task/050-owner-merge
+
+mkdir -p "$TMP/fakebin-merge"
+cat > "$TMP/fakebin-merge/gh" <<'FAKE'
+#!/usr/bin/env bash
+set -u
+case "${1:-} ${2:-}" in
+  "auth status") exit 0 ;;
+  "repo view") printf 'o/r\n'; exit 0 ;;
+  "pr list") printf '%s\n' "${FAKE_MERGED_JSON:-}"; exit 0 ;;
+  *) exit 1 ;;
+esac
+FAKE
+chmod +x "$TMP/fakebin-merge/gh"
+
+MERGED_JSON="$(jq -nc --arg m "$MERGE_050" --arg h "$PR_HEAD" \
+  '{number:50,url:"https://example.invalid/pr/50",mergeCommit:{oid:$m},reviewDecision:"APPROVED",headRefOid:$h}')"
+expect_ok "integrate records an owner-merged PR" \
+  env PATH="$TMP/fakebin-merge:$PATH" FAKE_MERGED_JSON="$MERGED_JSON" \
+  bash scripts/devloop/integrate.sh --task task-050 --pr
+REC="$ART_DIR/integrations/$MERGE_050.json"
+[ -f "$REC" ] && ok "integration record written for the merge commit" \
+  || ko "integration record written for the merge commit"
+[ "$(jq -r .head_sha "$REC" 2>/dev/null)" = "$PR_HEAD" ] \
+  && ok "record names the PR head" || ko "record names the PR head"
+[ "$(jq -r .base "$REC" 2>/dev/null)" = "$(git rev-parse "$MERGE_050^1")" ] \
+  && ok "record base is the merge first parent" || ko "record base is the merge first parent"
+
+# A branch that moved after the merge must be refused (same HEAD, fake PR head).
+FAKE_MERGE="$(printf 'f%.0s' $(seq 1 40))"
+MOVED_JSON="$(jq -nc --arg m "$FAKE_MERGE" --arg h "$(printf '0%.0s' $(seq 1 40))" \
+  '{number:50,url:"https://example.invalid/pr/50",mergeCommit:{oid:$m},reviewDecision:"APPROVED",headRefOid:$h}')"
+OUT="$(env PATH="$TMP/fakebin-merge:$PATH" FAKE_MERGED_JSON="$MOVED_JSON" \
+  bash scripts/devloop/integrate.sh --task task-050 --pr 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "branch moved after the merge" \
+  && ok "integrate refuses a branch that moved after the merge" \
+  || ko "integrate refuses a branch that moved after the merge"
+[ ! -f "$ART_DIR/integrations/$FAKE_MERGE.json" ] \
+  && ok "no record is written for a refused merge" || ko "no record is written for a refused merge"
+
 say "results"
 printf 'passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -62,7 +62,7 @@ Détail et règles d'écriture : `design/03-memory.md`.
 
 ## Ce qui est vérifié dans ce dépôt
 
-- `bash tests/run.sh` : **142 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
+- `bash tests/run.sh` : **148 assertions, 0 échec**. Le test crée un dépôt jetable, installe le
   kit, et vérifie les refus réels : commit hors convention, absence de revue, revue pour un SHA
   inconnu, revue invalidée par un commit de code, arbre sale, diff trop gros, gate rouge, push
   direct sur `main`, push non fast-forward, `--no-verify` rattrapé par `policy.sh`.
