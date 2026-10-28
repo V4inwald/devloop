@@ -207,7 +207,8 @@ if [ "$PR_MODE" -eq 1 ]; then
   # this command then rebuilds the record from verifiable evidence instead of
   # opening a second pull request.
   MERGED_JSON="$(gh pr list --head "$BRANCH" --base "$MAIN_BRANCH" --state merged --limit 1 \
-    --json number,url,mergeCommit,reviewDecision,headRefOid --jq '.[0] // empty' 2>/dev/null || true)"
+    --json number,url,mergeCommit,reviewDecision,headRefOid --jq '.[0] // empty' 2>/dev/null)" \
+    || die "cannot query merged pull requests; check gh auth and network"
   if [ -n "$MERGED_JSON" ]; then
     MERGE_SHA="$(printf '%s' "$MERGED_JSON" | jq -r '.mergeCommit.oid // empty')"
     PR_NUM="$(printf '%s' "$MERGED_JSON" | jq -r '.number // empty')"
@@ -225,6 +226,8 @@ if [ "$PR_MODE" -eq 1 ]; then
     git fetch -q origin "$MAIN_BRANCH" || die "cannot fetch origin/$MAIN_BRANCH"
     git merge-base --is-ancestor "$MERGE_SHA" "origin/$MAIN_BRANCH" \
       || die "merge commit $MERGE_SHA is not on origin/$MAIN_BRANCH; refusing to record it"
+    [ "$(git rev-list --parents -n 1 "$MERGE_SHA" | wc -w | tr -d ' ')" -eq 3 ] \
+      || die "$MERGE_SHA is not a two-parent merge commit; refusing to record it"
     BASE="$(git rev-parse "$MERGE_SHA^1")"
     check_contract_and_size
   else

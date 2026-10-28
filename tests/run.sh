@@ -914,8 +914,6 @@ REC="$ART_DIR/integrations/$MERGE_050.json"
   && ok "record names the PR head" || ko "record names the PR head"
 [ "$(jq -r .base "$REC" 2>/dev/null)" = "$(git rev-parse "$MERGE_050^1")" ] \
   && ok "record base is the merge first parent" || ko "record base is the merge first parent"
-
-# A branch that moved after the merge must be refused (same HEAD, fake PR head).
 FAKE_MERGE="$(printf 'f%.0s' $(seq 1 40))"
 MOVED_JSON="$(jq -nc --arg m "$FAKE_MERGE" --arg h "$(printf '0%.0s' $(seq 1 40))" \
   '{number:50,url:"https://example.invalid/pr/50",mergeCommit:{oid:$m},reviewDecision:"APPROVED",headRefOid:$h}')"
