@@ -151,22 +151,23 @@ if [ "$REVIEWED_SHA" != "$SHA" ]; then
   echo "devloop: review covers $REVIEWED_SHA; later commits only add docs/reviews/ (allowed)"
 fi
 
-# --- contract paths --------------------------------------------------------
-CHANGED="$(git diff --name-only "$BASE..$SHA")"
-TOUCHED=""
+# --- contract paths and size (single check, both integration modes) -------
 [ -n "$CONTRACT_PATHS" ] || die "CONTRACT_PATHS resolved empty; refusing to skip the contract check"
-for p in $CONTRACT_PATHS; do
-  if printf '%s\n' "$CHANGED" | grep -qE "^${p}(/|$)"; then TOUCHED="${TOUCHED:+$TOUCHED }$p"; fi
-done
-if [ -n "$TOUCHED" ] && [ "$REVIEW_CONTRACT" != "approved" ]; then
-  die "this change touches contract paths: $TOUCHED; the review must declare 'contract: approved'"
-fi
-
-# --- size ------------------------------------------------------------------
-LINES="$(diff_lines "$BASE")"
-if [ "$LINES" -gt "$MAX_DIFF_LINES" ] && [ "$ALLOW_OVERSIZED" -eq 0 ]; then
-  die "diff is $LINES lines, above MAX_DIFF_LINES=$MAX_DIFF_LINES; split the task or pass --allow-oversized"
-fi
+check_contract_and_size() {
+  CHANGED="$(git diff --name-only "$BASE..$SHA")"
+  TOUCHED=""
+  for p in $CONTRACT_PATHS; do
+    if printf '%s\n' "$CHANGED" | grep -qE "^${p}(/|$)"; then TOUCHED="${TOUCHED:+$TOUCHED }$p"; fi
+  done
+  if [ -n "$TOUCHED" ] && [ "$REVIEW_CONTRACT" != "approved" ]; then
+    die "this change touches contract paths: $TOUCHED; the review must declare 'contract: approved'"
+  fi
+  LINES="$(diff_lines "$BASE")"
+  if [ "$LINES" -gt "$MAX_DIFF_LINES" ] && [ "$ALLOW_OVERSIZED" -eq 0 ]; then
+    die "diff is $LINES lines, above MAX_DIFF_LINES=$MAX_DIFF_LINES; split the task or pass --allow-oversized"
+  fi
+}
+check_contract_and_size
 
 # --- CI (optional, needs an authenticated gh + a remote) -------------------
 if [ "$REQUIRE_CI" = "true" ] && [ "$PR_MODE" -eq 0 ]; then
@@ -202,52 +203,81 @@ if [ "$PR_MODE" -eq 1 ]; then
   gh auth status >/dev/null 2>&1 || die "--pr requires an authenticated gh"
   REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)" || die "cannot resolve GitHub repo"
 
-  git push -u origin "$BRANCH" || die "cannot push $BRANCH to origin"
-  PR_NUM="$(gh pr list --head "$BRANCH" --base "$MAIN_BRANCH" --state open --json number --jq '.[0].number // empty')"
-  if [ -z "$PR_NUM" ]; then
-    PR_BODY="$(printf 'Task: %s\nReviewed-by: %s\nReviewed-blob: %s\nGate: %s\n' \
-      "$TASK" "$REVIEW_FILE" "$REVIEW_BLOB" "$SHA")"
-    PR_URL="$(gh pr create --base "$MAIN_BRANCH" --head "$BRANCH" \
-      --title "chore(merge): integrate $TASK ($BRANCH)" --body "$PR_BODY")" \
-      || die "cannot create the pull request"
-    PR_NUM="$(gh pr view "$PR_URL" --json number -q .number)" || die "cannot read the pull request number"
+  # The owner may have merged the pull request from the GitHub UI. Re-running
+  # this command then rebuilds the record from verifiable evidence instead of
+  # opening a second pull request.
+  MERGED_JSON="$(gh pr list --head "$BRANCH" --base "$MAIN_BRANCH" --state merged --limit 1 \
+    --json number,url,mergeCommit,reviewDecision,headRefOid --jq '.[0] // empty' 2>/dev/null)" \
+    || die "cannot query merged pull requests; check gh auth and network"
+  if [ -n "$MERGED_JSON" ]; then
+    MERGE_SHA="$(printf '%s' "$MERGED_JSON" | jq -r '.mergeCommit.oid // empty')"
+    PR_NUM="$(printf '%s' "$MERGED_JSON" | jq -r '.number // empty')"
+    PR_URL="$(printf '%s' "$MERGED_JSON" | jq -r '.url // empty')"
+    MERGED_HEAD="$(printf '%s' "$MERGED_JSON" | jq -r '.headRefOid // empty')"
+    MERGED_DECISION="$(printf '%s' "$MERGED_JSON" | jq -r '.reviewDecision // ""')"
+    [ -n "$MERGE_SHA" ] || die "merged PR #$PR_NUM reports no merge commit"
+    [ "$MERGED_HEAD" = "$SHA" ] \
+      || die "branch moved after the merge: PR head $MERGED_HEAD, local HEAD $SHA"
+    case "$MERGED_DECISION" in
+      APPROVED|"") ;;
+      *) die "merged PR #$PR_NUM has review state '$MERGED_DECISION'; refusing to record it" ;;
+    esac
+    echo "devloop: PR #$PR_NUM was merged by the owner; recording its evidence"
+    git fetch -q origin "$MAIN_BRANCH" || die "cannot fetch origin/$MAIN_BRANCH"
+    git merge-base --is-ancestor "$MERGE_SHA" "origin/$MAIN_BRANCH" \
+      || die "merge commit $MERGE_SHA is not on origin/$MAIN_BRANCH; refusing to record it"
+    [ "$(git rev-list --parents -n 1 "$MERGE_SHA" | wc -w | tr -d ' ')" -eq 3 ] \
+      || die "$MERGE_SHA is not a two-parent merge commit; refusing to record it"
+    BASE="$(git merge-base "$SHA" "$MERGE_SHA^1")"
+    check_contract_and_size
   else
-    PR_URL="$(gh pr view "$PR_NUM" --json url -q .url)"
+    git push -u origin "$BRANCH" || die "cannot push $BRANCH to origin"
+    PR_NUM="$(gh pr list --head "$BRANCH" --base "$MAIN_BRANCH" --state open --json number --jq '.[0].number // empty')"
+    if [ -z "$PR_NUM" ]; then
+      PR_BODY="$(printf 'Task: %s\nReviewed-by: %s\nReviewed-blob: %s\nGate: %s\n' \
+        "$TASK" "$REVIEW_FILE" "$REVIEW_BLOB" "$SHA")"
+      PR_URL="$(gh pr create --base "$MAIN_BRANCH" --head "$BRANCH" \
+        --title "chore(merge): integrate $TASK ($BRANCH)" --body "$PR_BODY")" \
+        || die "cannot create the pull request"
+      PR_NUM="$(gh pr view "$PR_URL" --json number -q .number)" || die "cannot read the pull request number"
+    else
+      PR_URL="$(gh pr view "$PR_NUM" --json url -q .url)"
+    fi
+
+    # Check runs are created asynchronously after the PR event: wait for the
+    # suite to register instead of racing it and merging without CI.
+    CHECKS_READY=0
+    for _ in $(seq 1 24); do
+      CHECKS="$(gh pr checks "$PR_NUM" --json name 2>/dev/null || true)"
+      if [ -n "$CHECKS" ] && [ "$CHECKS" != "[]" ]; then CHECKS_READY=1; break; fi
+      sleep 5
+    done
+    [ "$CHECKS_READY" -eq 1 ] \
+      || die "no CI checks appeared on the PR after 2 minutes; enable the workflow before using --pr"
+    echo "devloop: waiting for the required checks on PR #$PR_NUM ($PR_URL)"
+    timeout "${CI_WAIT_SECONDS:-1800}" gh pr checks "$PR_NUM" --watch --fail-fast \
+      || die "PR checks failed or timed out; the PR was not merged"
+
+    # Branch protection may require an owner/reviewer approval. Do not let
+    # gh pr merge fail with a generic error: say exactly what is missing.
+    DECISION="$(gh pr view "$PR_NUM" --json reviewDecision --jq '.reviewDecision // ""' 2>/dev/null || true)"
+    case "$DECISION" in
+      APPROVED|"") ;;
+      REVIEW_REQUIRED)
+        die "PR #$PR_NUM needs an approving review; approve it, then re-run --pr" ;;
+      CHANGES_REQUESTED)
+        die "PR #$PR_NUM has requested changes; address them and re-run --pr" ;;
+      *)
+        die "PR #$PR_NUM has review state '$DECISION'; approve it, then re-run --pr" ;;
+    esac
+
+    gh pr merge "$PR_NUM" --merge \
+      || die "gh pr merge failed (required checks, protection, or conflict)"
+    git push origin --delete "$BRANCH" >/dev/null 2>&1 || true
+    MERGE_SHA="$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')" \
+      || die "cannot read the merge commit"
+    [ -n "$MERGE_SHA" ] || die "GitHub did not report a merge commit"
   fi
-
-  # Check runs are created asynchronously after the PR event: wait for the
-  # suite to register instead of racing it and merging without CI.
-  CHECKS_READY=0
-  for _ in $(seq 1 24); do
-    CHECKS="$(gh pr checks "$PR_NUM" --json name 2>/dev/null || true)"
-    if [ -n "$CHECKS" ] && [ "$CHECKS" != "[]" ]; then CHECKS_READY=1; break; fi
-    sleep 5
-  done
-  [ "$CHECKS_READY" -eq 1 ] \
-    || die "no CI checks appeared on the PR after 2 minutes; enable the workflow before using --pr"
-  echo "devloop: waiting for the required checks on PR #$PR_NUM ($PR_URL)"
-  timeout "${CI_WAIT_SECONDS:-1800}" gh pr checks "$PR_NUM" --watch --fail-fast \
-    || die "PR checks failed or timed out; the PR was not merged"
-
-  # Branch protection may require an owner/reviewer approval. Do not let
-  # gh pr merge fail with a generic error: say exactly what is missing.
-  DECISION="$(gh pr view "$PR_NUM" --json reviewDecision --jq '.reviewDecision // ""' 2>/dev/null || true)"
-  case "$DECISION" in
-    APPROVED|"") ;;
-    REVIEW_REQUIRED)
-      die "PR #$PR_NUM needs an approving review; approve it, then re-run --pr" ;;
-    CHANGES_REQUESTED)
-      die "PR #$PR_NUM has requested changes; address them and re-run --pr" ;;
-    *)
-      die "PR #$PR_NUM has review state '$DECISION'; approve it, then re-run --pr" ;;
-  esac
-
-  gh pr merge "$PR_NUM" --merge \
-    || die "gh pr merge failed (required checks, protection, or conflict)"
-  git push origin --delete "$BRANCH" >/dev/null 2>&1 || true
-  MERGE_SHA="$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')" \
-    || die "cannot read the merge commit"
-  [ -n "$MERGE_SHA" ] || die "GitHub did not report a merge commit"
 
   git fetch -q origin "$MAIN_BRANCH" || die "cannot fetch origin/$MAIN_BRANCH"
   MAIN_REF="refs/heads/$MAIN_BRANCH"

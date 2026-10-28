@@ -871,6 +871,145 @@ expect_fail "harness-check rejects an oversized AGENTS.md" bash "$HC" --root "$H
 mkdir -p "$HC_TMP/none"
 expect_fail "harness-check rejects a missing AGENTS.md" bash "$HC" --root "$HC_TMP/none" -q
 
+say "owner-merged pr"
+git remote get-url origin >/dev/null 2>&1 || git remote add origin "$TMP/remote.git"
+env ALLOW_MAIN_PUSH=1 git push -q origin main
+start_task task-050 050-owner-merge
+printf '\nexport function minus(a, b) { return a - b; }\n' >> src/math.js
+git add -A
+git commit -q -m "feat(math): add minus"
+bash scripts/devloop/gate.sh --quiet
+HEAD_050="$(git rev-parse HEAD)"
+write_review docs/reviews/task-050-r1.md "$HEAD_050" approve 0 task-050
+bash scripts/devloop/gate.sh --quiet
+PR_HEAD="$(git rev-parse HEAD)"
+git switch -q main
+printf '\nContract note on main.\n' >> AGENTS.md
+git add -A
+git commit -q -m "docs(agents): add a contract-path line on main"
+env ALLOW_MAIN_PUSH=1 git push -q origin main
+git merge -q --no-ff "$PR_HEAD" -m "Merge pull request #50 from o/task/050-owner-merge"
+MERGE_050="$(git rev-parse HEAD)"
+EXPECTED_BASE="$(git merge-base "$PR_HEAD" "$MERGE_050^1")"
+env ALLOW_MAIN_PUSH=1 git push -q origin main
+git switch -q task/050-owner-merge
+
+mkdir -p "$TMP/fakebin-merge"
+cat > "$TMP/fakebin-merge/gh" <<'FAKE'
+#!/usr/bin/env bash
+set -u
+case "${1:-} ${2:-}" in
+  "auth status") exit 0 ;;
+  "repo view") printf 'o/r\n'; exit 0 ;;
+  "pr list") printf '%s\n' "${FAKE_MERGED_JSON:-}"; exit 0 ;;
+  *) exit 1 ;;
+esac
+FAKE
+chmod +x "$TMP/fakebin-merge/gh"
+
+MERGED_JSON="$(jq -nc --arg m "$MERGE_050" --arg h "$PR_HEAD" \
+  '{number:50,url:"https://example.invalid/pr/50",mergeCommit:{oid:$m},reviewDecision:"APPROVED",headRefOid:$h}')"
+expect_ok "integrate records an owner-merged PR" \
+  env PATH="$TMP/fakebin-merge:$PATH" FAKE_MERGED_JSON="$MERGED_JSON" \
+  bash scripts/devloop/integrate.sh --task task-050 --pr
+REC="$ART_DIR/integrations/$MERGE_050.json"
+[ -f "$REC" ] && ok "integration record written for the merge commit" \
+  || ko "integration record written for the merge commit"
+[ "$(jq -r .head_sha "$REC" 2>/dev/null)" = "$PR_HEAD" ] \
+  && ok "record names the PR head" || ko "record names the PR head"
+[ "$(jq -r .base "$REC" 2>/dev/null)" = "$EXPECTED_BASE" ] \
+  && ok "record base is the fork point, not main's tip" \
+  || ko "record base is the fork point, not main's tip"
+[ "$EXPECTED_BASE" != "$(git rev-parse "$MERGE_050^1")" ] \
+  && ok "main advanced after the fork (base differs from merge parent)" \
+  || ko "main advanced after the fork (base differs from merge parent)"
+[ -z "$(git ls-remote --heads origin task/050-owner-merge 2>/dev/null)" ] \
+  && ok "merged path does not push the branch" || ko "merged path does not push the branch"
+git switch -q main
+expect_ok "doctor certifies the owner-merged integration" bash scripts/devloop/doctor.sh
+git switch -q task/050-owner-merge
+
+# A single-parent (squash-style) merge must be refused.
+git switch -q main
+printf '\n// squashed\n' >> src/math.js
+git add -A
+git commit -q -m "fix(math): squashed owner merge"
+SQUASH_SHA="$(git rev-parse HEAD)"
+env ALLOW_MAIN_PUSH=1 git push -q origin main
+git switch -q task/050-owner-merge
+SQUASH_JSON="$(jq -nc --arg m "$SQUASH_SHA" --arg h "$PR_HEAD" \
+  '{number:50,url:"https://example.invalid/pr/50",mergeCommit:{oid:$m},reviewDecision:"APPROVED",headRefOid:$h}')"
+OUT="$(env PATH="$TMP/fakebin-merge:$PATH" FAKE_MERGED_JSON="$SQUASH_JSON" \
+  bash scripts/devloop/integrate.sh --task task-050 --pr 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "two-parent merge" \
+  && ok "integrate refuses a single-parent owner merge" \
+  || ko "integrate refuses a single-parent owner merge"
+[ ! -f "$ART_DIR/integrations/$SQUASH_SHA.json" ] \
+  && ok "no record is written for a squash merge" || ko "no record is written for a squash merge"
+
+# A merged branch touching a contract path without contract approval is refused.
+start_task task-052 052-contract-merge
+mkdir -p scripts/devloop
+printf 'probe\n' > scripts/devloop/probe-note.txt
+git add -A
+git commit -q -m "chore(devloop): add a contract-path probe"
+bash scripts/devloop/gate.sh --quiet
+H52="$(git rev-parse HEAD)"
+write_review docs/reviews/task-052-r1.md "$H52" approve 0 task-052
+bash scripts/devloop/gate.sh --quiet
+PR52="$(git rev-parse HEAD)"
+git switch -q main
+git merge -q --no-ff "$PR52" -m "Merge pull request #52 from o/task/052-contract-merge"
+M52="$(git rev-parse HEAD)"
+env ALLOW_MAIN_PUSH=1 git push -q origin main
+git switch -q task/052-contract-merge
+C52_JSON="$(jq -nc --arg m "$M52" --arg h "$PR52" \
+  '{number:52,url:"https://example.invalid/pr/52",mergeCommit:{oid:$m},reviewDecision:"APPROVED",headRefOid:$h}')"
+OUT="$(env PATH="$TMP/fakebin-merge:$PATH" FAKE_MERGED_JSON="$C52_JSON" \
+  bash scripts/devloop/integrate.sh --task task-052 --pr 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "touches contract paths" \
+  && ok "merged mode refuses a contract path without approval" \
+  || ko "merged mode refuses a contract path without approval"
+[ ! -f "$ART_DIR/integrations/$M52.json" ] \
+  && ok "no record for a contract-refused merge" || ko "no record for a contract-refused merge"
+
+# A merged branch above MAX_DIFF_LINES is refused in merged mode too.
+start_task task-053 053-big-merge
+seq 1 401 | sed 's/^/\/\/ line /' > src/big.js
+git add -A
+git commit -q -m "feat(math): add a generated file"
+bash scripts/devloop/gate.sh --quiet
+H53="$(git rev-parse HEAD)"
+write_review docs/reviews/task-053-r1.md "$H53" approve 0 task-053
+bash scripts/devloop/gate.sh --quiet
+PR53="$(git rev-parse HEAD)"
+git switch -q main
+git merge -q --no-ff "$PR53" -m "Merge pull request #53 from o/task/053-big-merge"
+M53="$(git rev-parse HEAD)"
+env ALLOW_MAIN_PUSH=1 git push -q origin main
+git switch -q task/053-big-merge
+C53_JSON="$(jq -nc --arg m "$M53" --arg h "$PR53" \
+  '{number:53,url:"https://example.invalid/pr/53",mergeCommit:{oid:$m},reviewDecision:"APPROVED",headRefOid:$h}')"
+OUT="$(env PATH="$TMP/fakebin-merge:$PATH" FAKE_MERGED_JSON="$C53_JSON" \
+  bash scripts/devloop/integrate.sh --task task-053 --pr 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "above MAX_DIFF_LINES" \
+  && ok "merged mode refuses an oversized diff" \
+  || ko "merged mode refuses an oversized diff"
+[ ! -f "$ART_DIR/integrations/$M53.json" ] \
+  && ok "no record for an oversized merge" || ko "no record for an oversized merge"
+
+git switch -q task/050-owner-merge
+FAKE_MERGE="$(printf 'f%.0s' $(seq 1 40))"
+MOVED_JSON="$(jq -nc --arg m "$FAKE_MERGE" --arg h "$(printf '0%.0s' $(seq 1 40))" \
+  '{number:50,url:"https://example.invalid/pr/50",mergeCommit:{oid:$m},reviewDecision:"APPROVED",headRefOid:$h}')"
+OUT="$(env PATH="$TMP/fakebin-merge:$PATH" FAKE_MERGED_JSON="$MOVED_JSON" \
+  bash scripts/devloop/integrate.sh --task task-050 --pr 2>&1 || true)"
+printf '%s' "$OUT" | grep -q "branch moved after the merge" \
+  && ok "integrate refuses a branch that moved after the merge" \
+  || ko "integrate refuses a branch that moved after the merge"
+[ ! -f "$ART_DIR/integrations/$FAKE_MERGE.json" ] \
+  && ok "no record is written for a refused merge" || ko "no record is written for a refused merge"
+
 say "results"
 printf 'passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
