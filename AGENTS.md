@@ -104,8 +104,8 @@ Do not copy details into `AGENTS.md`. It must stay small enough to be read at ev
 
 ## 8. Session start
 
-Read `docs/STATE.md`; run `bash scripts/devloop/doctor.sh` and fix errors first; read your task
-file; if `last_verified_sha` != HEAD, re-verify before trusting the state.
+For implementation/integration, read `docs/STATE.md`, run `bash scripts/devloop/doctor.sh`, and
+read the task; re-verify stale state. Explanation/planning alone does not authorize execution.
 
 ## 9. Escalate to the human
 
@@ -127,8 +127,8 @@ State what you need, the options, and your recommendation. Do not guess silently
 
 ## 11. Operating rules (every task)
 
-1. **Run it, don't recite it.** A command whose purpose is to run now is run now. Never hand the
-   human a command as prose when you can execute it; report the exit code and the line that matters.
+1. **Respect the requested mode.** Execute only when action is requested or needed within its
+   authorized scope. A request for a command or a plan alone does not authorize running it.
 2. **Evidence before claim.** Re-open what you wrote and re-run the check before saying done. A
    claim without `command -> result` or `path:line` is not a report.
 3. **Never invent a path, version, id or value.** Observe it (`test -e`, `--version`, `rg`) or tag
