@@ -1,6 +1,6 @@
 ---
 id: task-019
-status: ready
+status: review
 branch: task/019-proof-integrity
 created: 2026-11-11
 owner: human
@@ -54,5 +54,11 @@ les changements de CI/contrôles versionnés le 2026-11-11 ; protections inchang
 
 ## Notes / decisions
 
+- Baseline ciblée sur le gate d'origine : exit 1, 6 assertions vertes et 14
+  rouges (mutations non détectées et helper lint absent). Le contre-exemple
+  `bash -n <(printf 'echo valid\n') <(printf 'if\n')` sortait 0 malgré le
+  second script invalide : le défaut de lint est observé indépendamment.
+- Après correction : `bash tests/proof-integrity.sh` = 24 assertions, 0 échec,
+  exit 0 ; `bash scripts/devloop/lint-shell.sh` et `git diff --check` sortent 0.
 - Pas d'intégration ni de déploiement avant revue ; état historique non certifié
   par la simple lecture de STATE. Pas de leçon générale déduite d'une seule sonde.
