@@ -5,7 +5,7 @@
 # Exit:  0 all checks passed on a clean tree (integrable)
 #        1 at least one check failed
 #        2 config/usage error
-#        3 checks passed but the tree was dirty (NOT integrable)
+#        3 checks passed but the tree was dirty or HEAD changed (NOT integrable)
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 need jq
 
@@ -56,18 +56,26 @@ if [ "$COUNT" -eq 0 ]; then
   die "no CHECK_* commands configured in .devloop.conf; nothing was verified"
 fi
 
+# Checks can modify files, stage changes, or even move HEAD. Never certify the
+# initial commit from a final repository state that no longer describes it.
+HEAD_AFTER="$(head_sha)"
+HEAD_CHANGED=false
+[ "$HEAD_AFTER" = "$SHA" ] || HEAD_CHANGED=true
+if is_dirty; then DIRTY=true; fi
 CHECKS_JSON="$(jq -s '.' "$OUT/checks.ndjson")"
 OK=false
-[ "$FAIL" -eq 0 ] && OK=true
+if [ "$FAIL" -eq 0 ] && [ "$HEAD_CHANGED" = false ]; then OK=true; fi
 
 jq -n \
   --arg sha "$SHA" --arg branch "$BRANCH" --arg task "$TASK" \
+  --arg head_after "$HEAD_AFTER" --argjson head_changed "$HEAD_CHANGED" \
   --argjson dirty "$DIRTY" --argjson ok "$OK" --argjson checks "$CHECKS_JSON" \
   --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{sha:$sha,branch:$branch,task:$task,dirty:$dirty,ok:$ok,checks:$checks,generated_at:$ts}' \
+  '{sha:$sha,branch:$branch,task:$task,dirty:$dirty,ok:$ok,checks:$checks,
+    head_after:$head_after,head_changed:$head_changed,generated_at:$ts}' \
   > "$OUT/result.json"
 
-if [ "$OK" != true ]; then
+if [ "$FAIL" -ne 0 ]; then
   if [ "$QUIET" -eq 0 ]; then
     if [ "$DIRTY" = true ]; then
       echo "devloop: gate FAILED on a dirty tree; fix the checks and commit before re-running."
@@ -78,10 +86,10 @@ if [ "$OK" != true ]; then
   exit 1
 fi
 
-if [ "$DIRTY" = true ]; then
+if [ "$DIRTY" = true ] || [ "$HEAD_CHANGED" = true ]; then
   if [ "$QUIET" -eq 0 ]; then
-    echo "devloop: gate UNVERIFIED (checks passed, dirty working tree); this result cannot be integrated."
-    echo "devloop: commit the work and re-run -> ${OUT#"$ROOT"/}/result.json"
+    echo "devloop: gate UNVERIFIED (dirty working tree or HEAD changed); this result cannot be integrated."
+    echo "devloop: review the repository state, commit if needed and re-run -> ${OUT#"$ROOT"/}/result.json"
   fi
   exit 3
 fi
