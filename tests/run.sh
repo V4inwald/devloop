@@ -871,6 +871,9 @@ expect_fail "harness-check rejects an oversized AGENTS.md" bash "$HC" --root "$H
 mkdir -p "$HC_TMP/none"
 expect_fail "harness-check rejects a missing AGENTS.md" bash "$HC" --root "$HC_TMP/none" -q
 
+say "common guidance"
+expect_ok "common guidance is structurally coherent" bash "$SRC/tests/common-guidance.sh"
+
 say "results"
 printf 'passed: %d, failed: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

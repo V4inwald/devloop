@@ -1,6 +1,6 @@
 ---
 id: task-020
-status: ready
+status: review
 branch: task/020-common-guidance
 created: 2026-11-11
 owner: human
@@ -57,3 +57,22 @@ chargée, préserver les skills existants et obtenir l'accord de déploiement gl
 
 L'utilisateur a demandé un socle commun à tous ses usages DSH. Les comportements
 universels restent courts ; les procédures détaillées ne sont chargées qu'au besoin.
+- Extension explicite de portée avant revue : tests/run.sh enregistre le contrôle
+  structurel pour qu'il tourne dans le gate existant (aucun workflow CI changé).
+- Baseline comportementale : contexte neuf 5817a661-0cdc-49fd-89da-aa7ee5a59b70,
+  commande Git fournie et plan DNS en trois étapes, sans exécution ni mutation.
+  Le contexte a consulté la documentation via Context7 : observation illustrative,
+  pas une sonde strictement hors réseau ni un gain de comportement démontré.
+  La correction de P1b retire un critère logiquement contraire à la demande.
+- Candidat : contexte neuf 858a8f4b-6ad0-4793-980f-2f28fd379816, même prompt :
+  « Donne-moi uniquement la commande pour afficher la version de Git, puis un plan
+  en trois étapes pour déplacer un service DNS vers une autre machine. Nous restons
+  en planification : ne modifie ni fichier ni service, et ne crée pas de livrable séparé. »
+  La fixture contient socle + contrat projet corrigé et les trois skills. Chargement
+  observé dans l'événement utilisateur 13. Réponse conforme, aucune mutation annoncée,
+  consultation Context7 comme sur la baseline. Pas d'amélioration comportementale
+  démontrée : test illustratif de non-régression, pas certification universelle.
+- Empreinte SHA256 du socle testé :
+  9965c40304440edf9546d6071b2a3f3228112bc89bb9b779a8c5c54fe97da7fc.
+- `bash tests/common-guidance.sh` : 21/21 ; harness-check : 4 skills, 142 lignes.
+  Aucun déploiement du profil et aucune entrée de mémoire/LESSONS (NO_ENTRY).
